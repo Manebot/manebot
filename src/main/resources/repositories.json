@@ -1,0 +1,14 @@
+{
+  "repositories": [
+    {
+      "id": "jitpack",
+      "name": "jitpack.io",
+      "url": "https://jitpack.io/"
+    },
+    {
+      "id": "central",
+      "name": "Maven central",
+      "url": "https://central.maven.org/maven2/"
+    }
+  ]
+}

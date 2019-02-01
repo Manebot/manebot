@@ -38,28 +38,28 @@ public final class JavaPluginLoader implements PluginLoader {
         final LocalURLClassLoader pluginClassLoader = new LocalURLClassLoader(new URL[] { classpathUrl }, null);
 
         // Collect runtime/classpath dependencies, obtain() all of them, then install them into a classLoader
-        GlobalArtifactRepository libraryRepository = new GlobalArtifactRepository(artifact.getRepositories());
         Collection<ArtifactDependency> dependencyDefinitions = artifact.getDependencies();
         List<URL> dependencies = new LinkedList<>();
         for (ArtifactDependency dependency : dependencyDefinitions) {
-            if (dependency.getType() == ArtifactDependencyLevel.COMPILE) continue;
-
-            Artifact manifest;
-
-            // pull artifact from repository
-            try {
-                 manifest = libraryRepository.getArtifact(dependency);
-            } catch (ArtifactRepositoryException e) {
-                throw new PluginLoadException("failed to find library artifact " + dependency.toString(), e);
-            }
-
-            // associate URL of dependency with the dependency list
-            try {
-                dependencies.add(manifest.obtain().getFile().toURI().toURL());
-            } catch (ArtifactRepositoryException e) {
-                throw new PluginLoadException("failed to load library artifact " + dependency.toString(), e);
-            } catch (MalformedURLException e) {
-                throw new PluginLoadException(e);
+            switch (dependency.getType()) {
+                case TEST:
+                    continue;
+                case COMPILE:
+                case RUN:
+                    // associate URL of dependency with the dependency list
+                    try {
+                        dependencies.add(dependency.getChild().obtain().getFile().toURI().toURL());
+                    } catch (ArtifactRepositoryException e) {
+                        throw new PluginLoadException("failed to load library artifact " + dependency.toString(), e);
+                    } catch (MalformedURLException e) {
+                        throw new PluginLoadException(e);
+                    }
+                case PROVIDED:
+                    // "shared" libraries
+                    // PROVIDED dependencies are treated as shared dependencies, run in the classpath of the dependency
+                    // graph, and are attached typically as plugins.  jbot-core is usually ignored, though the API
+                    // version the plugin references in its pom.xml is important, and will be validated.
+                    throw new UnsupportedOperationException(); //TODO
             }
         }
         URL[] libraryURLArray = new URL[dependencies.size()];

@@ -4,6 +4,8 @@
 .idea/
 *.iml
 
+mvn/
+
 # Log file
 *.log
 

@@ -1,3 +1,4 @@
+import com.github.manevolent.jbot.artifact.Artifact;
 import com.github.manevolent.jbot.artifact.ArtifactManifest;
 import com.github.manevolent.jbot.artifact.LocalArtifact;
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
@@ -8,10 +9,10 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 
-public class ArtifactDownloadTest extends TestCase {
+public class ArtifactLatestVersionTest extends TestCase {
 
     public static void main(String[] args) throws Exception {
-        new ArtifactDownloadTest().testParser();
+        new ArtifactLatestVersionTest().testParser();
     }
 
     public void testParser() throws Exception {
@@ -25,13 +26,10 @@ public class ArtifactDownloadTest extends TestCase {
         );
 
         ArtifactManifest manifest = repository.getManifest("com.google.code.gson", "gson");
-        Collection<String> versionList = manifest.getVersions();
-        for (String artifactVersion : versionList) {
-            LocalArtifact obtainedArtifact = manifest.getArtifact(artifactVersion).obtain();
-            assertNotNull(obtainedArtifact);
+        Artifact artifact;
+        assertNotNull(artifact = manifest.getArtifact(manifest.getLatestVersion()));
 
-            System.err.println(obtainedArtifact.toString() + ": " + obtainedArtifact.getFile());
-        }
+        System.out.println(artifact.getVersion());
     }
 
 }

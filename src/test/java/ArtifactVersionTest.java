@@ -1,4 +1,4 @@
-import com.github.manevolent.jbot.artifact.Version;
+
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
 import junit.framework.TestCase;
 import org.eclipse.aether.repository.RemoteRepository;

@@ -1,14 +1,12 @@
-{
-  "repositories": [
-    {
-      "id": "jitpack",
-      "type": "default",
-      "url": "http://jitpack.io/"
-    },
-    {
-      "id": "central",
-      "type": "default",
-      "url": "http://central.maven.org/maven2/"
-    }
-  ]
-}
+[
+  {
+    "id": "jitpack",
+    "type": "default",
+    "url": "http://jitpack.io/"
+  },
+  {
+    "id": "central",
+    "type": "default",
+    "url": "http://central.maven.org/maven2/"
+  }
+]

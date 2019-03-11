@@ -1,7 +1,6 @@
 package com.github.manevolent.jbot.artifact.aether;
 
 import com.github.manevolent.jbot.artifact.*;
-import com.github.manevolent.jbot.artifact.Version;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;

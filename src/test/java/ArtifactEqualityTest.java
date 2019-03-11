@@ -8,10 +8,10 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 
-public class ArtifactDownloadTest extends TestCase {
+public class ArtifactEqualityTest extends TestCase {
 
     public static void main(String[] args) throws Exception {
-        new ArtifactDownloadTest().testParser();
+        new ArtifactEqualityTest().testParser();
     }
 
     public void testParser() throws Exception {
@@ -27,10 +27,9 @@ public class ArtifactDownloadTest extends TestCase {
         ArtifactManifest manifest = repository.getManifest("com.google.code.gson", "gson");
         Collection<String> versionList = manifest.getVersions();
         for (String artifactVersion : versionList) {
-            LocalArtifact obtainedArtifact = manifest.getArtifact(artifactVersion).obtain();
-            assertNotNull(obtainedArtifact);
-
-            System.err.println(obtainedArtifact.toString() + ": " + obtainedArtifact.getFile());
+            LocalArtifact a = manifest.getArtifact(artifactVersion).obtain();
+            LocalArtifact b = manifest.getArtifact(artifactVersion).obtain();
+            assertEquals(a, b);
         }
     }
 

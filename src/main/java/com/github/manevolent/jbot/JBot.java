@@ -5,30 +5,34 @@ import com.github.manevolent.jbot.artifact.Repositories;
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
 import com.github.manevolent.jbot.command.CommandDispatcher;
 import com.github.manevolent.jbot.command.CommandManager;
+import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
+import com.github.manevolent.jbot.command.DefaultCommandManager;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
+import com.github.manevolent.jbot.event.DefaultEventManager;
 import com.github.manevolent.jbot.event.EventDispatcher;
-import com.github.manevolent.jbot.event.EventManager;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.plugin.Plugin;
 import com.github.manevolent.jbot.plugin.PluginException;
+import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
 import com.github.manevolent.jbot.user.UserManager;
 import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 
 public final class JBot implements Bot, Runnable {
-    private PluginLoaderRegistry pluginLoaderRegistry;
-    private CommandManager commandManager;
-    private CommandDispatcher commandDispatcher;
-    private EventManager eventManager;
-    private EventDispatcher eventDispatcher;
-    private ArtifactRepository repository;
+    private final PluginLoaderRegistry pluginLoaderRegistry = new PluginLoaderRegistry();
+    {
+        pluginLoaderRegistry.registerLoader("jar", new JavaPluginLoader());
+    }
+
+    private final CommandManager commandManager = new DefaultCommandManager();
+    private final CommandDispatcher commandDispatcher = new DefaultCommandDispatcher(commandManager);
+    private final DefaultEventManager eventManager = new DefaultEventManager();
+    private final EventDispatcher eventDispatcher = eventManager;
 
     private final List<Platform> platforms = new LinkedList<>();
     private final List<Plugin> plugins = new LinkedList<>();
@@ -39,13 +43,18 @@ public final class JBot implements Bot, Runnable {
     private BotState state = BotState.STOPPED;
     private Date started;
 
-    private JBot() {
+    // Mutable providers, managers, types
+    private ArtifactRepository repository;
+    private ConversationProvider conversationProvider;
+    private UserManager userManager;
 
+    private JBot() {
+        
     }
 
     @Override
     public List<Platform> getPlatforms() {
-        return platforms;
+        return Collections.unmodifiableList(platforms);
     }
 
     @Override
@@ -85,12 +94,22 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public UserManager getUserManager() {
-        return null;
+        return userManager;
+    }
+
+    @Override
+    public void setUserManager(UserManager userManager) {
+        this.userManager = userManager;
     }
 
     @Override
     public ConversationProvider getConversationProvider() {
-        return null;
+        return conversationProvider;
+    }
+
+    @Override
+    public void setConversationProvider(ConversationProvider conversationProvider) {
+        this.conversationProvider = conversationProvider;
     }
 
     private void setState(BotState state) {
@@ -236,6 +255,9 @@ public final class JBot implements Bot, Runnable {
             if (option.flag) {
                 if (cmd.hasOption(option.name))
                     value = "set";
+                else {
+                    // Not set
+                }
             } else {
                 if (cmd.hasOption(option.name)) {
                     value = cmd.getOptionValue(option.name, option.defaultValue);
@@ -243,6 +265,8 @@ public final class JBot implements Bot, Runnable {
                     value = properties.get(option.name).toString();
                 } else if (System.getProperties().containsKey("jbot." + option.name)) {
                     value = System.getProperties().get("jbot." + option.name).toString();
+                } else {
+                    value = option.defaultValue;
                 }
             }
 

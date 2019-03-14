@@ -5,9 +5,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 public class DefaultEventManager implements EventManager, EventDispatcher {
     private final LinkedHashMap<Class<? extends Event>, List<EventAction>> eventMap = new LinkedHashMap<>();
+
+    public DefaultEventManager() {
+
+    }
 
     @Override
     public void registerListener(EventListener eventListener) {

@@ -2,10 +2,12 @@ package com.github.manevolent.jbot.platform.console;
 
 import com.github.manevolent.jbot.chat.Chat;
 import com.github.manevolent.jbot.chat.ChatMessage;
+import com.github.manevolent.jbot.chat.RichChatMessage;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.user.User;
 
 import java.util.Collection;
+import java.util.Collections;
 
 public class ConsoleChat implements Chat {
     @Override
@@ -25,12 +27,12 @@ public class ConsoleChat implements Chat {
 
     @Override
     public void removeMember(String s) {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void addMember(String s) {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -45,17 +47,22 @@ public class ConsoleChat implements Chat {
 
     @Override
     public Collection<String> getPlatformMemberIds() {
-        return null;
+        return Collections.singletonList("stdin");
     }
 
     @Override
     public boolean isPrivate() {
-        return false;
+        return true;
     }
 
     @Override
     public void sendMessage(String s) {
 
+    }
+
+    @Override
+    public void sendMessage(RichChatMessage richChatMessage) throws UnsupportedOperationException {
+        sendMessage(richChatMessage.getMessage());
     }
 
     @Override

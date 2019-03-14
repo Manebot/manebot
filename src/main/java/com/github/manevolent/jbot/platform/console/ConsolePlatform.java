@@ -5,9 +5,12 @@ import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.user.UserAssociation;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class ConsolePlatform implements Platform {
+    private final ConsoleChat chat = new ConsoleChat();
+
     @Override
     public String getId() {
         return "console";
@@ -30,6 +33,6 @@ public class ConsolePlatform implements Platform {
 
     @Override
     public List<Chat> getChats() {
-        return null;
+        return Collections.singletonList(chat);
     }
 }

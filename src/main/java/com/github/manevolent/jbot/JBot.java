@@ -8,10 +8,12 @@ import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
 import com.github.manevolent.jbot.command.DefaultCommandManager;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
+import com.github.manevolent.jbot.database.DatabaseManager;
+import com.github.manevolent.jbot.database.HibernateManager;
+import com.github.manevolent.jbot.database.model.*;
 import com.github.manevolent.jbot.event.DefaultEventManager;
 import com.github.manevolent.jbot.event.EventDispatcher;
 import com.github.manevolent.jbot.platform.Platform;
-import com.github.manevolent.jbot.plugin.Plugin;
 import com.github.manevolent.jbot.plugin.PluginException;
 import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
@@ -20,6 +22,7 @@ import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -35,11 +38,12 @@ public final class JBot implements Bot, Runnable {
     private final EventDispatcher eventDispatcher = eventManager;
 
     private final List<Platform> platforms = new LinkedList<>();
-    private final List<Plugin> plugins = new LinkedList<>();
+    private final List<com.github.manevolent.jbot.plugin.Plugin> plugins = new LinkedList<>();
 
     private final List<Consumer<BotState>> stateListeners = new LinkedList<>();
 
     private final Object stateLock = new Object();
+
     private BotState state = BotState.STOPPED;
     private Date started;
 
@@ -47,6 +51,8 @@ public final class JBot implements Bot, Runnable {
     private ArtifactRepository repository;
     private ConversationProvider conversationProvider;
     private UserManager userManager;
+    private DatabaseManager databaseManager;
+    private com.github.manevolent.jbot.database.Database systemDatabase;
 
     private JBot() {
         
@@ -60,6 +66,11 @@ public final class JBot implements Bot, Runnable {
     @Override
     public BotState getState() {
         return state;
+    }
+
+    @Override
+    public com.github.manevolent.jbot.database.Database getSystemDatabase() {
+        return systemDatabase;
     }
 
     @Override
@@ -78,7 +89,7 @@ public final class JBot implements Bot, Runnable {
     }
 
     @Override
-    public Collection<Plugin> getPlugins() {
+    public Collection<com.github.manevolent.jbot.plugin.Plugin> getPlugins() {
         return Collections.unmodifiableCollection(plugins);
     }
 
@@ -140,7 +151,7 @@ public final class JBot implements Bot, Runnable {
 
             setState(BotState.STARTING);
 
-            for (Plugin plugin : getPlugins()) {
+            for (com.github.manevolent.jbot.plugin.Plugin plugin : getPlugins()) {
                 try {
                     plugin.setEnabled(true);
                 } catch (PluginException e) {
@@ -163,7 +174,7 @@ public final class JBot implements Bot, Runnable {
             setState(BotState.STOPPING);
 
             try {
-                for (Plugin plugin : getPlugins()) {
+                for (com.github.manevolent.jbot.plugin.Plugin plugin : getPlugins()) {
                     try {
                         plugin.setEnabled(false);
                     } catch (PluginException e) {
@@ -233,6 +244,37 @@ public final class JBot implements Bot, Runnable {
                             break;
                     }
                 }), "wait when bot is stopped"));
+
+
+        optionList.add(new Option(
+                'h', "hibernateConfiguration", false, "hibernate.properties", value ->  {
+                    try {
+                        Properties properties = new Properties();
+                        properties.load(new FileReader(new File(value)));
+
+                        bot.databaseManager = new HibernateManager(properties);
+
+                        bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
+                            model.registerEntity(Plugin.class);
+                            model.registerEntity(Database.class);
+                            model.registerEntity(Entity.class);
+                            model.registerEntity(EntityType.class);
+                            model.registerEntity(Permission.class);
+                            model.registerEntity(Group.class);
+                            model.registerEntity(com.github.manevolent.jbot.database.model.Platform.class);
+                            model.registerEntity(User.class);
+                            model.registerEntity(UserType.class);
+                            model.registerEntity(UserAssociation.class);
+                            model.registerEntity(Conversation.class);
+                            model.registerEntity(UserGroup.class);
+                            model.registerEntity(PluginConfiguration.class);
+
+                           return model.define();
+                        });
+                    } catch (Exception ex) {
+                        throw new RuntimeException("Problem reading Hibernate configuration", ex);
+                    }
+        }, "Hibernate configuration file"));
 
         Options options = new Options();
 

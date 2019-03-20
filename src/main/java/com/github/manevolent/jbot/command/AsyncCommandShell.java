@@ -19,7 +19,7 @@ public class AsyncCommandShell extends CommandShell implements Runnable {
     private boolean running = false;
 
     AsyncCommandShell(CommandManager commandManager, User user, int backlog, Runnable complete) {
-        super(commandManager);
+        super(commandManager, eventDispatcher);
 
         this.complete = complete;
         this.user = user;

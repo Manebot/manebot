@@ -1,6 +1,10 @@
 package com.github.manevolent.jbot.command;
 
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
+import com.github.manevolent.jbot.event.EventDispatcher;
+import com.github.manevolent.jbot.event.EventExecutionException;
+import com.github.manevolent.jbot.event.chat.CommandMessageReceivedEvent;
+
 import com.github.manevolent.jbot.user.User;
 import com.google.common.collect.MapMaker;
 
@@ -13,9 +17,11 @@ public class DefaultCommandDispatcher implements CommandDispatcher {
     private final Map<User, AsyncCommandShell> executors = new MapMaker().weakKeys().makeMap();
 
     private final CommandManager commandManager;
+    private final EventDispatcher eventDispatcher;
 
-    public DefaultCommandDispatcher(CommandManager commandManager) {
+    public DefaultCommandDispatcher(CommandManager commandManager, EventDispatcher eventDispatcher) {
         this.commandManager = commandManager;
+        this.eventDispatcher = eventDispatcher;
     }
 
     @Override
@@ -29,6 +35,12 @@ public class DefaultCommandDispatcher implements CommandDispatcher {
 
     @Override
     public Future<?> executeAsync(CommandMessage commandMessage) {
+        try {
+            eventDispatcher.execute(new CommandMessageReceivedEvent(this, commandMessage));
+        } catch (EventExecutionException e) {
+            throw new RuntimeException(e);
+        }
+
         AsyncCommandShell execution;
 
         synchronized (executors) {

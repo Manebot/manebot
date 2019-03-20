@@ -4,6 +4,9 @@ import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
 import com.github.manevolent.jbot.command.exception.CommandNotFoundException;
 import com.github.manevolent.jbot.command.executor.CommandExecutor;
+import com.github.manevolent.jbot.event.EventDispatcher;
+import com.github.manevolent.jbot.event.EventExecutionException;
+import com.github.manevolent.jbot.event.command.CommandExecutionEvent;
 import com.github.manevolent.jbot.user.User;
 
 import java.util.logging.Level;
@@ -11,9 +14,11 @@ import java.util.logging.Logger;
 
 abstract class CommandShell {
     private final CommandManager commandManager;
+    private final EventDispatcher eventDispatcher;
 
-    protected CommandShell(CommandManager commandManager) {
+    protected CommandShell(CommandManager commandManager, EventDispatcher eventDispatcher) {
         this.commandManager = commandManager;
+        this.eventDispatcher = eventDispatcher;
     }
 
     public abstract User getUser();
@@ -35,6 +40,14 @@ abstract class CommandShell {
         // Find command associated with this label
         CommandExecutor executor = commandManager.getExecutor(label);
         if (executor == null) throw new CommandNotFoundException(label);
+
+        try {
+            eventDispatcher.execute(
+                    new CommandExecutionEvent(this, executor, commandMessage.getSender(), commandMessage)
+            );
+        } catch (EventExecutionException e) {
+            throw new CommandExecutionException(e);
+        }
 
         try {
             if (executor.isBuffered() && commandMessage.getSender().getChat().isBuffered())

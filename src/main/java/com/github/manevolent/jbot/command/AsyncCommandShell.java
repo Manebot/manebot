@@ -1,5 +1,6 @@
 package com.github.manevolent.jbot.command;
 
+import com.github.manevolent.jbot.event.EventDispatcher;
 import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.virtual.Virtual;
 import com.github.manevolent.jbot.virtual.VirtualProcess;
@@ -18,7 +19,8 @@ public class AsyncCommandShell extends CommandShell implements Runnable {
     private VirtualProcess process;
     private boolean running = false;
 
-    AsyncCommandShell(CommandManager commandManager, User user, int backlog, Runnable complete) {
+    AsyncCommandShell(CommandManager commandManager, EventDispatcher eventDispatcher,
+                      User user, int backlog, Runnable complete) {
         super(commandManager, eventDispatcher);
 
         this.complete = complete;

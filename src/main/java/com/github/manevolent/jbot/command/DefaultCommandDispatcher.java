@@ -46,7 +46,8 @@ public class DefaultCommandDispatcher implements CommandDispatcher {
         synchronized (executors) {
             execution = executors.computeIfAbsent(
                     commandMessage.getSender().getUser(),
-                    user -> new AsyncCommandShell(commandManager, user, queueSize, () -> {
+                    user -> new AsyncCommandShell(commandManager, eventDispatcher,
+                            user, queueSize, () -> {
                         synchronized (executors) {
                             executors.remove(user);
                         }

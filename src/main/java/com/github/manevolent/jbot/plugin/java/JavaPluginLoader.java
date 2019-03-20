@@ -1,9 +1,11 @@
 package com.github.manevolent.jbot.plugin.java;
 
 import com.github.manevolent.jbot.artifact.*;
+import com.github.manevolent.jbot.plugin.DefaultPluginManager;
 import com.github.manevolent.jbot.plugin.Plugin;
 import com.github.manevolent.jbot.plugin.PluginLoadException;
 
+import com.github.manevolent.jbot.plugin.PluginManager;
 import com.github.manevolent.jbot.plugin.java.classloader.ClassSource;
 import com.github.manevolent.jbot.plugin.java.classloader.LocalClassLoader;
 import com.github.manevolent.jbot.plugin.java.classloader.LocalURLClassLoader;
@@ -22,6 +24,10 @@ import java.util.concurrent.ExecutionException;
 
 public final class JavaPluginLoader implements PluginLoader {
     private Map<ArtifactIdentifier, JavaPluginInstance> pluginInstances = new LinkedHashMap<>();
+
+    public JavaPluginLoader(PluginManager pluginManager) {
+
+    }
 
     @Override
     public Plugin load(LocalArtifact artifact) throws PluginLoadException, FileNotFoundException {

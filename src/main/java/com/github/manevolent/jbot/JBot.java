@@ -13,6 +13,7 @@ import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
 import com.github.manevolent.jbot.conversation.DefaultConversationProvider;
 import com.github.manevolent.jbot.database.DatabaseManager;
+import com.github.manevolent.jbot.plugin.DefaultPluginManager;
 import com.github.manevolent.jbot.user.DefaultUserManager;
 import com.github.manevolent.jbot.database.HibernateManager;
 import com.github.manevolent.jbot.database.model.*;
@@ -25,8 +26,6 @@ import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.platform.PlatformRegistration;
 import com.github.manevolent.jbot.platform.console.ConsolePlatformConnection;
 import com.github.manevolent.jbot.plugin.PluginException;
-import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
-import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
 import com.github.manevolent.jbot.user.UserManager;
 import com.github.manevolent.jbot.user.UserType;
 import com.github.manevolent.jbot.virtual.DefaultVirtual;
@@ -44,19 +43,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class JBot implements Bot, Runnable {
-    private final PluginLoaderRegistry pluginLoaderRegistry = new PluginLoaderRegistry();
-    {
-        pluginLoaderRegistry.registerLoader("jar", new JavaPluginLoader());
-    }
-
-    private final CommandManager commandManager = new DefaultCommandManager();
-    private final CommandDispatcher commandDispatcher = new DefaultCommandDispatcher(commandManager);
     private final DefaultEventManager eventManager = new DefaultEventManager();
-    private final ConversationProvider conversationProvider = new DefaultConversationProvider(this);
     private final EventDispatcher eventDispatcher = eventManager;
+    private final CommandManager commandManager = new DefaultCommandManager();
+    private final CommandDispatcher commandDispatcher = new DefaultCommandDispatcher(commandManager, eventDispatcher);
+    private final ConversationProvider conversationProvider = new DefaultConversationProvider(this);
     private final ChatDispatcher chatDispatcher = new DefaultChatDispatcher(this);
-
-    private final List<com.github.manevolent.jbot.plugin.Plugin> plugins = new LinkedList<>();
+    private final DefaultPluginManager pluginManager = new DefaultPluginManager(this, eventManager);
 
     private final List<Consumer<BotState>> stateListeners = new LinkedList<>();
 
@@ -72,7 +65,9 @@ public final class JBot implements Bot, Runnable {
     private PlatformManager platformManager;
     private com.github.manevolent.jbot.database.Database systemDatabase;
 
-    private JBot() { }
+    private JBot() {
+
+    }
 
     @Override
     public Collection<Platform> getPlatforms() {
@@ -100,18 +95,8 @@ public final class JBot implements Bot, Runnable {
     }
 
     @Override
-    public PluginLoaderRegistry getPluginLoaderRegistry() {
-        return pluginLoaderRegistry;
-    }
-
-    @Override
-    public ArtifactRepository getRepostiory() {
-        return repository;
-    }
-
-    @Override
-    public Collection<com.github.manevolent.jbot.plugin.Plugin> getPlugins() {
-        return Collections.unmodifiableCollection(plugins);
+    public DefaultPluginManager getPluginManager() {
+        return pluginManager;
     }
 
     @Override
@@ -173,11 +158,11 @@ public final class JBot implements Bot, Runnable {
 
             setState(BotState.STARTING);
 
-            for (com.github.manevolent.jbot.plugin.Plugin plugin : getPlugins()) {
+            // Start all auto-start plugins
+            for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
                 try {
                     plugin.setEnabled(true);
                 } catch (PluginException e) {
-                    setState(BotState.STOPPED);
                     throw new RuntimeException(e);
                 }
             }
@@ -202,7 +187,7 @@ public final class JBot implements Bot, Runnable {
             setState(BotState.STOPPING);
 
             try {
-                for (com.github.manevolent.jbot.plugin.Plugin plugin : getPlugins()) {
+                for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
                     try {
                         plugin.setEnabled(false);
                     } catch (PluginException e) {
@@ -401,6 +386,10 @@ public final class JBot implements Bot, Runnable {
         Logger.getGlobal().info("JBot started successfully.");
 
         bot.start();
+    }
+
+    public ArtifactRepository getRepository() {
+        return repository;
     }
 
     private static final class LogTimer implements AutoCloseable {

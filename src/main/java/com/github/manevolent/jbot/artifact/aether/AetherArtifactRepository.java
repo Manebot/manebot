@@ -226,7 +226,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
                 try {
                     result = system.readArtifactDescriptor(session, request);
                 } catch (ArtifactDescriptorException e) {
-                    throw new RuntimeException(e); //TODO
+                    throw new RuntimeException(e);
                 }
 
                 dependentArtifacts.add(new AetherDependency(

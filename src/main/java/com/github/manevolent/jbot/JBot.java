@@ -3,21 +3,34 @@ package com.github.manevolent.jbot;
 import com.github.manevolent.jbot.artifact.ArtifactRepository;
 import com.github.manevolent.jbot.artifact.Repositories;
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
+import com.github.manevolent.jbot.chat.ChatDispatcher;
+import com.github.manevolent.jbot.chat.DefaultChatDispatcher;
 import com.github.manevolent.jbot.command.CommandDispatcher;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
 import com.github.manevolent.jbot.command.DefaultCommandManager;
+import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
+import com.github.manevolent.jbot.conversation.DefaultConversationProvider;
 import com.github.manevolent.jbot.database.DatabaseManager;
+import com.github.manevolent.jbot.user.DefaultUserManager;
 import com.github.manevolent.jbot.database.HibernateManager;
 import com.github.manevolent.jbot.database.model.*;
 import com.github.manevolent.jbot.event.DefaultEventManager;
 import com.github.manevolent.jbot.event.EventDispatcher;
+import com.github.manevolent.jbot.log.LineLogFormatter;
+import com.github.manevolent.jbot.platform.DefaultPlatformManager;
 import com.github.manevolent.jbot.platform.Platform;
+import com.github.manevolent.jbot.platform.PlatformManager;
+import com.github.manevolent.jbot.platform.PlatformRegistration;
+import com.github.manevolent.jbot.platform.console.ConsolePlatformConnection;
 import com.github.manevolent.jbot.plugin.PluginException;
 import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
 import com.github.manevolent.jbot.user.UserManager;
+import com.github.manevolent.jbot.user.UserType;
+import com.github.manevolent.jbot.virtual.DefaultVirtual;
+import com.github.manevolent.jbot.virtual.Virtual;
 import org.apache.commons.cli.*;
 
 import java.io.File;
@@ -25,6 +38,10 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public final class JBot implements Bot, Runnable {
     private final PluginLoaderRegistry pluginLoaderRegistry = new PluginLoaderRegistry();
@@ -35,9 +52,10 @@ public final class JBot implements Bot, Runnable {
     private final CommandManager commandManager = new DefaultCommandManager();
     private final CommandDispatcher commandDispatcher = new DefaultCommandDispatcher(commandManager);
     private final DefaultEventManager eventManager = new DefaultEventManager();
+    private final ConversationProvider conversationProvider = new DefaultConversationProvider(this);
     private final EventDispatcher eventDispatcher = eventManager;
+    private final ChatDispatcher chatDispatcher = new DefaultChatDispatcher(this);
 
-    private final List<Platform> platforms = new LinkedList<>();
     private final List<com.github.manevolent.jbot.plugin.Plugin> plugins = new LinkedList<>();
 
     private final List<Consumer<BotState>> stateListeners = new LinkedList<>();
@@ -49,18 +67,21 @@ public final class JBot implements Bot, Runnable {
 
     // Mutable providers, managers, types
     private ArtifactRepository repository;
-    private ConversationProvider conversationProvider;
     private UserManager userManager;
     private DatabaseManager databaseManager;
+    private PlatformManager platformManager;
     private com.github.manevolent.jbot.database.Database systemDatabase;
 
-    private JBot() {
-        
+    private JBot() { }
+
+    @Override
+    public Collection<Platform> getPlatforms() {
+        return platformManager.getPlatforms();
     }
 
     @Override
-    public List<Platform> getPlatforms() {
-        return Collections.unmodifiableList(platforms);
+    public Platform getPlatformById(String id) {
+        return platformManager.getPlatformById(id);
     }
 
     @Override
@@ -104,23 +125,18 @@ public final class JBot implements Bot, Runnable {
     }
 
     @Override
+    public ChatDispatcher getChatDispatcher() {
+        return chatDispatcher;
+    }
+
+    @Override
     public UserManager getUserManager() {
         return userManager;
     }
 
     @Override
-    public void setUserManager(UserManager userManager) {
-        this.userManager = userManager;
-    }
-
-    @Override
     public ConversationProvider getConversationProvider() {
         return conversationProvider;
-    }
-
-    @Override
-    public void setConversationProvider(ConversationProvider conversationProvider) {
-        this.conversationProvider = conversationProvider;
     }
 
     private void setState(BotState state) {
@@ -145,6 +161,12 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public void start() throws IllegalAccessException {
+        try {
+            com.github.manevolent.jbot.security.Permission.checkPermission("system.start");
+        } catch (CommandAccessException e) {
+            throw new IllegalAccessException(e.getMessage());
+        }
+
         synchronized (stateLock) {
             BotState state = getState();
             if (state != BotState.STOPPED) throw new IllegalStateException(state.name());
@@ -167,6 +189,12 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public void stop() throws IllegalAccessException {
+        try {
+            com.github.manevolent.jbot.security.Permission.checkPermission("system.stop");
+        } catch (CommandAccessException e) {
+            throw new IllegalAccessException(e.getMessage());
+        }
+
         synchronized (stateLock) {
             BotState state = getState();
             if (state != BotState.RUNNING) throw new IllegalStateException(state.name());
@@ -225,6 +253,27 @@ public final class JBot implements Bot, Runnable {
 
     public static void main(String[] args)
             throws Exception {
+        Logger logger = Logger.getGlobal();
+
+        logger.setUseParentHandlers(false);
+
+        FileHandler allMessages = new FileHandler("info.log", true);
+        allMessages.setFormatter(new LineLogFormatter());
+        allMessages.setLevel(Level.INFO);
+        logger.addHandler(allMessages);
+
+        FileHandler errorMessages = new FileHandler("error.log", true);
+        errorMessages.setFormatter(new LineLogFormatter());
+        errorMessages.setLevel(Level.SEVERE);
+        logger.addHandler(errorMessages);
+
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setFormatter(new LineLogFormatter());
+        handler.setLevel(Level.ALL);
+        logger.addHandler(handler);
+
+        logger.info("Starting JBot...");
+
         JBot bot = new JBot();
 
         List<Option> optionList = new ArrayList<>();
@@ -248,29 +297,33 @@ public final class JBot implements Bot, Runnable {
 
         optionList.add(new Option(
                 'h', "hibernateConfiguration", false, "hibernate.properties", value ->  {
-                    try {
+                    try (LogTimer section_configuring = new LogTimer("Configuring database")) {
                         Properties properties = new Properties();
                         properties.load(new FileReader(new File(value)));
 
-                        bot.databaseManager = new HibernateManager(properties);
+                        try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
+                            bot.databaseManager = new HibernateManager(bot, properties);
 
-                        bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
-                            model.registerEntity(Plugin.class);
-                            model.registerEntity(Database.class);
-                            model.registerEntity(Entity.class);
-                            model.registerEntity(EntityType.class);
-                            model.registerEntity(Permission.class);
-                            model.registerEntity(Group.class);
-                            model.registerEntity(com.github.manevolent.jbot.database.model.Platform.class);
-                            model.registerEntity(User.class);
-                            model.registerEntity(UserType.class);
-                            model.registerEntity(UserAssociation.class);
-                            model.registerEntity(Conversation.class);
-                            model.registerEntity(UserGroup.class);
-                            model.registerEntity(PluginConfiguration.class);
+                            bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
+                                model.registerEntity(Plugin.class);
+                                model.registerEntity(Database.class);
+                                model.registerEntity(Entity.class);
+                                model.registerEntity(Permission.class);
+                                model.registerEntity(Group.class);
+                                model.registerEntity(com.github.manevolent.jbot.database.model.Platform.class);
+                                model.registerEntity(User.class);
+                                model.registerEntity(UserAssociation.class);
+                                model.registerEntity(Conversation.class);
+                                model.registerEntity(UserGroup.class);
+                                model.registerEntity(PluginConfiguration.class);
+                                model.registerEntity(UserBan.class);
 
-                           return model.define();
-                        });
+                                return model.define();
+                            });
+
+                            bot.userManager = new DefaultUserManager(bot.systemDatabase);
+                            bot.platformManager = new DefaultPlatformManager(bot.systemDatabase);
+                        }
                     } catch (Exception ex) {
                         throw new RuntimeException("Problem reading Hibernate configuration", ex);
                     }
@@ -291,31 +344,80 @@ public final class JBot implements Bot, Runnable {
         if (propertiesFile.exists())
             properties.load(new FileInputStream(propertiesFile));
 
-        for (Option option : optionList) {
-            String value = null;
+        try (LogTimer timer = new LogTimer("Parsing commandline options")) {
+            for (Option option : optionList) {
+                String value = null;
 
-            if (option.flag) {
-                if (cmd.hasOption(option.name))
-                    value = "set";
-                else {
-                    // Not set
-                }
-            } else {
-                if (cmd.hasOption(option.name)) {
-                    value = cmd.getOptionValue(option.name, option.defaultValue);
-                } else if (properties.containsKey(option.name)) {
-                    value = properties.get(option.name).toString();
-                } else if (System.getProperties().containsKey("jbot." + option.name)) {
-                    value = System.getProperties().get("jbot." + option.name).toString();
+                if (option.flag) {
+                    if (cmd.hasOption(option.name))
+                        value = "set";
+                    else {
+                        // Not set
+                    }
                 } else {
-                    value = option.defaultValue;
+                    if (cmd.hasOption(option.name)) {
+                        value = cmd.getOptionValue(option.name, option.defaultValue);
+                    } else if (properties.containsKey(option.name)) {
+                        value = properties.get(option.name).toString();
+                    } else if (System.getProperties().containsKey("jbot." + option.name)) {
+                        value = System.getProperties().get("jbot." + option.name).toString();
+                    } else {
+                        value = option.defaultValue;
+                    }
                 }
-            }
 
-            if (value != null) option.valueConsumer.accept(value);
+                if (value != null) option.valueConsumer.accept(value);
+            }
         }
 
+        // Get root user
+        String rootUsername = "root";
+        com.github.manevolent.jbot.user.User user;
+        try (LogTimer section_login = new LogTimer("Logging in as \"" + rootUsername + "\"")) {
+            user = bot.getUserManager().getUserByName(rootUsername);
+
+            if (user == null){
+                logger.info("Creating new root user \"" + rootUsername + "\".");
+                user = bot.getUserManager().createUser(rootUsername, UserType.SYSTEM);
+                logger.info("Created new root user \"" + rootUsername + "\".");
+            }
+        }
+
+        user.setType(UserType.SYSTEM);
+
+        logger.info("Logged in as " + user.getName() + ".");
+
+        Virtual.setInstance(new DefaultVirtual(user));
+
+        PlatformManager.Builder platformBuilder = bot.platformManager.buildPlatform();
+        PlatformRegistration consolePlatformRegistration = platformBuilder
+                .id("console").name("Console")
+                .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))
+                .register(null);
+        // Ensure registered to stdin
+        user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
+        consolePlatformRegistration.getConnection().connect();
+
+        Logger.getGlobal().info("JBot started successfully.");
+
         bot.start();
+    }
+
+    private static final class LogTimer implements AutoCloseable {
+        private final long start = System.currentTimeMillis();
+        private final String step;
+
+        private LogTimer(String step) {
+            this.step = step;
+
+            Logger.getGlobal().log(Level.INFO, "[" + step + "] - started");
+        }
+
+        @Override
+        public void close() throws Exception {
+            Logger.getGlobal().log(Level.INFO, "[" + step + "] - completed (" +
+                    (System.currentTimeMillis() - start) + "ms).");
+        }
     }
 
     private static class Option {

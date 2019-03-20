@@ -1,5 +1,7 @@
 package com.github.manevolent.jbot.database.model;
 
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
 
 @javax.persistence.Entity
@@ -11,7 +13,23 @@ import javax.persistence.*;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"userId", "groupId"})}
 )
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class UserGroup {
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public UserGroup(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
+    public UserGroup(com.github.manevolent.jbot.database.Database database,
+                     User user,
+                     Group group,
+                     User addingUser) {
+        this(database);
+
+        this.user = user;
+        this.group = group;
+        this.addingUser = addingUser;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -78,5 +96,10 @@ public class UserGroup {
 
     public void setAddingUser(User addingUser) {
         this.addingUser = addingUser;
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(xrefId);
     }
 }

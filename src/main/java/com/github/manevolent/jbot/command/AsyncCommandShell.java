@@ -4,25 +4,24 @@ import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.virtual.Virtual;
 import com.github.manevolent.jbot.virtual.VirtualProcess;
 
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AsyncCommandShell extends CommandShell implements Runnable {
     private final long maximumIdleTime = 120_000L;
 
+    private final Runnable complete;
     private final User user;
     private final BlockingDeque<AsyncCommand> queue;
 
     private VirtualProcess process;
     private boolean running = false;
 
-    AsyncCommandShell(CommandManager commandManager, User user, int backlog) {
+    AsyncCommandShell(CommandManager commandManager, User user, int backlog, Runnable complete) {
         super(commandManager);
 
+        this.complete = complete;
         this.user = user;
         this.queue = new LinkedBlockingDeque<>(backlog);
         this.process = Virtual.getInstance().create(this);
@@ -49,6 +48,8 @@ public class AsyncCommandShell extends CommandShell implements Runnable {
             } else if (process.isRunning() && !process.isCallerSelf()) {
                 process.interrupt();
             }
+
+            if (!b) complete.run();
         }
     }
 
@@ -98,7 +99,7 @@ public class AsyncCommandShell extends CommandShell implements Runnable {
                 }
             }
         } finally {
-            running = false;
+            setRunning(false);
         }
     }
 }

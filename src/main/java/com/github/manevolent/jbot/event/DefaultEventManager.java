@@ -4,10 +4,10 @@ import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
+import java.util.concurrent.*;
 
 public class DefaultEventManager implements EventManager, EventDispatcher {
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final LinkedHashMap<Class<? extends Event>, List<EventAction>> eventMap = new LinkedHashMap<>();
 
     public DefaultEventManager() {
@@ -41,10 +41,17 @@ public class DefaultEventManager implements EventManager, EventDispatcher {
     }
 
     @Override
-    public Event fire(Event event) throws EventExecutionException {
+    public <T extends Event> Future<T> executeAsync(T event) {
+        return executorService.submit(() -> execute(event));
+    }
+
+    @Override
+    public <T extends Event> T execute(T event) throws EventExecutionException {
         List<EventAction> actions = eventMap.get(event.getClass());
         if (actions == null) return event;
+
         for (EventAction action : actions) action.getEventExecutor().fire(event);
+
         return event;
     }
 

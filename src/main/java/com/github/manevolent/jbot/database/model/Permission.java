@@ -1,6 +1,12 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.security.Grant;
+import com.github.manevolent.jbot.security.GrantedPermission;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
+import java.sql.SQLException;
+import java.util.Date;
 
 @javax.persistence.Entity
 @Table(
@@ -10,7 +16,26 @@ import javax.persistence.*;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"entityId","node"})}
 )
-public class Permission {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Permission extends TimedRow implements GrantedPermission {
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public Permission(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
+
+    public Permission(com.github.manevolent.jbot.database.Database database,
+                      Entity entity,
+                      User grantingUser,
+                      String node,
+                      boolean allow) {
+        this(database);
+
+        this.entity = entity;
+        this.grantingUser = grantingUser;
+        this.node = node;
+        this.allow = allow;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,61 +56,47 @@ public class Permission {
     @Column(nullable = false)
     private boolean allow;
 
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
-
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public Integer getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
-    }
-
-    public boolean isAllow() {
-        return allow;
-    }
-
-    public void setAllow(boolean allow) {
-        this.allow = allow;
-    }
-
-    public String getNode() {
-        return node;
-    }
-
-    public void setNode(String node) {
-        this.node = node;
-    }
-
-    public User getGrantingUser() {
-        return grantingUser;
-    }
-
-    public void setGrantingUser(User grantingUser) {
-        this.grantingUser = grantingUser;
+    public int getPermissionId() {
+        return permissionId;
     }
 
     public Entity getEntity() {
         return entity;
     }
 
-    public void setEntity(Entity entity) {
-        this.entity = entity;
+    @Override
+    public com.github.manevolent.jbot.security.Permission getPermission() {
+        return com.github.manevolent.jbot.security.Permission.get(node);
     }
 
-    public int getPermissionId() {
-        return permissionId;
+    @Override
+    public Grant getGrant() {
+        return Grant.fromValue(allow);
+    }
+
+    public void setGrant(Grant grant) {
+        try {
+            database.executeTransaction(s -> {
+                Permission permission = s.find(Permission.class, getPermissionId());
+                permission.allow = grant == Grant.ALLOW;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public com.github.manevolent.jbot.user.User getGranter() {
+        return grantingUser;
+    }
+
+    @Override
+    public Date getDate() {
+        return getCreatedDate();
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(permissionId);
     }
 }

@@ -1,5 +1,7 @@
 package com.github.manevolent.jbot.database;
 
+import com.github.manevolent.jbot.Bot;
+import com.github.manevolent.jbot.JBot;
 import com.google.common.collect.MapMaker;
 import org.hibernate.*;
 import org.hibernate.boot.model.naming.*;
@@ -8,7 +10,11 @@ import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.type.Type;
 
 import javax.persistence.EntityManager;
+import javax.persistence.Id;
 import java.io.Serializable;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -16,6 +22,7 @@ import java.util.stream.Collectors;
 public class HibernateManager implements DatabaseManager {
     private static final String tableNamingFormat = "%s_%s";
 
+    private final JBot bot;
     private final Properties properties;
 
     private final Object entityLock = new Object();
@@ -75,9 +82,17 @@ public class HibernateManager implements DatabaseManager {
 
             return entityByName.get(entityName).getInstance(id);
         }
+
+        @Override
+        public Object instantiate(String entityName, EntityMode entityMode, Serializable id) {
+            EntityMapping mapping = entityByName.get(entityName);
+            if (mapping == null) return null;
+            return mapping.newInstance(id);
+        }
     };
 
-    public HibernateManager(Properties properties) {
+    public HibernateManager(JBot bot, Properties properties) {
+        this.bot = bot;
         this.properties = new Properties();
 
         for (String property : properties.stringPropertyNames())
@@ -94,9 +109,9 @@ public class HibernateManager implements DatabaseManager {
         );
     }
 
-    private EntityMapping registerEntityClass(Database database, Class<?> clazz) {
+    private EntityMapping registerEntityClass(Database database, Class<?> clazz) throws ReflectiveOperationException {
         synchronized (entityLock) {
-            EntityMapping mapping = new EntityMapping(clazz, database);
+            EntityMapping mapping = new EntityMapping(clazz, database, buildInstantiator(clazz, database));
 
             entities.add(mapping);
             entityByName.put(clazz.getName(), mapping);
@@ -121,6 +136,11 @@ public class HibernateManager implements DatabaseManager {
         classes.forEach(configuration::addAnnotatedClass);
 
         return configuration.buildSessionFactory();
+    }
+
+    @Override
+    public Bot getBot() {
+        return bot;
     }
 
     @Override
@@ -224,6 +244,52 @@ public class HibernateManager implements DatabaseManager {
         });
     }
 
+    private Field findPrimaryField(Class<?> entityClass) {
+        for (Field field : entityClass.getDeclaredFields()) {
+            Id annotation = field.getAnnotation(Id.class);
+            field.setAccessible(true);
+            if (annotation != null) return field;
+        }
+
+        return null;
+    }
+
+    private Function<Serializable, ?> buildInstantiator(Class<?> entityClass,
+                                                        com.github.manevolent.jbot.database.Database database)
+            throws ReflectiveOperationException {
+        final Field identifierField = findPrimaryField(entityClass);
+
+        try {
+            final Constructor<?> constructor = entityClass.getConstructor(
+                    com.github.manevolent.jbot.database.Database.class
+            );
+
+            return (Function<Serializable, Object>) serializable -> {
+                try {
+                    Object o = constructor.newInstance(database);
+                    if (identifierField != null) identifierField.set(o, serializable);
+
+                    return o;
+                } catch (ReflectiveOperationException e) {
+                    throw new RuntimeException(e);
+                }
+            };
+        } catch (NoSuchMethodException ex) {
+            final Constructor<?> constructor = entityClass.getConstructor();
+
+            return (Function<Serializable, Object>) serializable -> {
+                try {
+                    Object o = constructor.newInstance();
+                    if (identifierField != null) identifierField.set(o, serializable);
+
+                    return o;
+                } catch (ReflectiveOperationException e) {
+                    throw new RuntimeException(e);
+                }
+            };
+        }
+    }
+
     private class Database implements com.github.manevolent.jbot.database.Database {
         private final HibernateManager instance = HibernateManager.this;
 
@@ -251,10 +317,21 @@ public class HibernateManager implements DatabaseManager {
 
         private SessionFactory buildSessionFactory() {
             // register own entities
-            selfEntities.forEach(clazz -> selfMappings.add(registerEntityClass(this, clazz)));
+            selfEntities.forEach(clazz -> {
+                try {
+                    selfMappings.add(registerEntityClass(this, clazz));
+                } catch (ReflectiveOperationException e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
             // build the SessionFactory used to interact with this model graph
             return buildFactory(allEntities);
+        }
+
+        @Override
+        public DatabaseManager getDatabaseManager() {
+            return HibernateManager.this;
         }
 
         @Override
@@ -300,10 +377,14 @@ public class HibernateManager implements DatabaseManager {
         private final Class<?> clazz;
         private final Database database;
         private final Map<Serializable, Object> persistenceMap = new MapMaker().weakValues().makeMap();
+        private final Function<Serializable, ?> instantiator;
 
-        private EntityMapping(Class<?> clazz, Database database) {
+        private EntityMapping(Class<?> clazz,
+                              Database database,
+                              Function<Serializable, ?> instantiator) {
             this.clazz = clazz;
             this.database = database;
+            this.instantiator = instantiator;
         }
 
         public Class<?> getEntityClass() {
@@ -329,6 +410,10 @@ public class HibernateManager implements DatabaseManager {
         @Override
         public int hashCode() {
             return clazz.hashCode() ^ database.hashCode();
+        }
+
+        public Object newInstance(Serializable id) {
+            return instantiator.apply(id);
         }
     }
 }

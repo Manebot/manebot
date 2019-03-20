@@ -1,7 +1,13 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.user.UserGroup;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @javax.persistence.Entity
 @Table(
@@ -15,7 +21,13 @@ import java.util.Set;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"name"})}
 )
-public class Group {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Group extends TimedRow implements UserGroup {
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public Group(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,9 +37,6 @@ public class Group {
     @Column(length = 64, nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    private boolean admin;
-
     @ManyToOne(optional = false)
     @JoinColumn(name = "owningUserId")
     private User owningUser;
@@ -36,27 +45,8 @@ public class Group {
     @JoinColumn(name = "entityId")
     private Entity entity;
 
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
-
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
-    }
+    @OneToMany(mappedBy = "group")
+    private Set<com.github.manevolent.jbot.database.model.UserGroup> userGroups;
 
     public Entity getEntity() {
         return entity;
@@ -66,16 +56,32 @@ public class Group {
         this.entity = entity;
     }
 
-    public boolean isAdmin() {
-        return admin;
-    }
-
-    public void setAdmin(boolean admin) {
-        this.admin = admin;
-    }
-
     public String getName() {
         return name;
+    }
+
+    @Override
+    public com.github.manevolent.jbot.user.User getOwner() {
+        return owningUser;
+    }
+
+    @Override
+    public Collection<com.github.manevolent.jbot.user.User> getUsers() {
+        return Collections.unmodifiableCollection(
+                userGroups.stream()
+                .map(com.github.manevolent.jbot.database.model.UserGroup::getUser)
+                .collect(Collectors.toList())
+        );
+    }
+
+    @Override
+    public void addUser(com.github.manevolent.jbot.user.User user) throws SecurityException {
+
+    }
+
+    @Override
+    public void removeUser(com.github.manevolent.jbot.user.User user) throws SecurityException {
+
     }
 
     public void setName(String name) {
@@ -92,5 +98,10 @@ public class Group {
 
     public void setOwningUser(User owningUser) {
         this.owningUser = owningUser;
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(groupId);
     }
 }

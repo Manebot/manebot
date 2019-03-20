@@ -1,5 +1,7 @@
 package com.github.manevolent.jbot.database.model;
 
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
 
 @javax.persistence.Entity
@@ -9,7 +11,13 @@ import javax.persistence.*;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"pluginId","name"})}
 )
-public class PluginConfiguration {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class PluginConfiguration extends TimedRow {
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public PluginConfiguration(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,12 +33,6 @@ public class PluginConfiguration {
 
     @Column(nullable = true)
     private String value;
-
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
 
     public int getPluginConfigurationId() {
         return pluginConfigurationId;
@@ -60,19 +62,8 @@ public class PluginConfiguration {
         this.value = value;
     }
 
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(pluginConfigurationId);
     }
 }

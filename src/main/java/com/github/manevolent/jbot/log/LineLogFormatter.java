@@ -38,7 +38,8 @@ public class LineLogFormatter extends Formatter {
 
         sb.append("[").append(record.getLoggerName()).append("] ");
 
-        VirtualProcess currentProcess = Virtual.getInstance().currentProcess();
+        Virtual virtual = Virtual.getInstance();
+        VirtualProcess currentProcess = virtual == null ? null : virtual.currentProcess();
         sb.append("[").append(currentProcess != null ?
                 currentProcess.getName() :
                 ("anon-" + Thread.currentThread().getId())).append("] ");

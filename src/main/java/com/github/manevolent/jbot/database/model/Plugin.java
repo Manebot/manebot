@@ -1,6 +1,7 @@
 package com.github.manevolent.jbot.database.model;
 
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
 import java.util.Set;
@@ -13,7 +14,16 @@ import java.util.Set;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"packageId","artifactId","version"})}
 )
-public class Plugin {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Plugin extends TimedRow {
+    @Transient
+    private com.github.manevolent.jbot.plugin.Plugin plugin;
+
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public Plugin(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,12 +41,6 @@ public class Plugin {
 
     @Column(nullable = false)
     private boolean enabled;
-
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
 
     @OneToMany(mappedBy = "plugin")
     private Set<Database> databases;
@@ -70,23 +74,16 @@ public class Plugin {
         return databases;
     }
 
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
-    }
-
     public Set<PluginConfiguration> getPluginConfigurations() {
         return pluginConfigurations;
+    }
+
+    public com.github.manevolent.jbot.plugin.Plugin getPlugin() {
+        return plugin;
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(pluginId);
     }
 }

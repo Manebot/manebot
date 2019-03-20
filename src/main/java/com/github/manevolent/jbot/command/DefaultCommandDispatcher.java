@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 public class DefaultCommandDispatcher implements CommandDispatcher {
+    private static final int queueSize = 3;
+
     private final Map<User, AsyncCommandShell> executors = new MapMaker().weakKeys().makeMap();
 
     private final CommandManager commandManager;
@@ -32,7 +34,11 @@ public class DefaultCommandDispatcher implements CommandDispatcher {
         synchronized (executors) {
             execution = executors.computeIfAbsent(
                     commandMessage.getSender().getUser(),
-                    user -> new AsyncCommandShell(commandManager, user, 3)
+                    user -> new AsyncCommandShell(commandManager, user, queueSize, () -> {
+                        synchronized (executors) {
+                            executors.remove(user);
+                        }
+                    })
             );
         }
 

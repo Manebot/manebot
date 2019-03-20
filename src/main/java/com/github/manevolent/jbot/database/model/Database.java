@@ -1,5 +1,7 @@
 package com.github.manevolent.jbot.database.model;
 
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
 
 @javax.persistence.Entity
@@ -12,7 +14,13 @@ import javax.persistence.*;
                 @Index(columnList = "pluginId,name", unique = true)
         }
 )
-public class Database {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Database extends TimedRow {
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public Database(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,12 +33,6 @@ public class Database {
     @ManyToOne(optional = true)
     @JoinColumn(name = "pluginId")
     private Plugin plugin;
-
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
 
     public int getDatabaseId() {
         return databaseId;
@@ -56,19 +58,8 @@ public class Database {
         this.plugin = plugin;
     }
 
-    public Integer getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
-    }
-
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(databaseId);
     }
 }

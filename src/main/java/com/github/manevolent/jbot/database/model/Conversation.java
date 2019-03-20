@@ -1,5 +1,10 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.chat.Chat;
+import com.github.manevolent.jbot.platform.PlatformConnection;
+import com.github.manevolent.jbot.platform.PlatformRegistration;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+
 import javax.persistence.*;
 import java.util.Set;
 
@@ -12,7 +17,33 @@ import java.util.Set;
         },
         uniqueConstraints = {@UniqueConstraint(columnNames ={"platformId", "id"})}
 )
-public class Conversation {
+@org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+public class Conversation extends TimedRow implements com.github.manevolent.jbot.conversation.Conversation {
+    @Transient
+    private final Object chatLock = new Object();
+
+    /**
+     * Chat instance/hook
+     */
+    @Transient
+    private Chat chat;
+
+    @Transient
+    private final com.github.manevolent.jbot.database.Database database;
+    public Conversation(com.github.manevolent.jbot.database.Database database) {
+        this.database = database;
+    }
+
+    public Conversation(com.github.manevolent.jbot.database.Database database,
+                        Entity entity,
+                        Platform platform,
+                        String id) {
+        this(database);
+
+        this.entity = entity;
+        this.platform = platform;
+        this.id = id;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,33 +58,42 @@ public class Conversation {
     @JoinColumn(name = "platformId")
     private Platform platform;
 
+    /**
+     * platform-specific Chat id
+     */
     @Column(length = 128, nullable = false)
     private String id;
 
-    @Column(nullable = false)
-    private int created;
-
-    @Column(nullable = true)
-    private Integer updated;
-
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
+    public int getConversationId() {
+        return conversationId;
     }
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    public Chat getChat() {
+        synchronized (chatLock) {
+            if (chat == null || !chat.isConnected()) {
+                PlatformRegistration platformRegistration = getPlatform().getRegistration();
+
+                if (platformRegistration == null)
+                    throw new IllegalStateException("platform not registered: " + getPlatform().getId());
+
+                PlatformConnection connection = platformRegistration.getConnection();
+
+                if (connection == null || !connection.isConnected())
+                    throw new IllegalStateException("platform not connected: " + getPlatform().getId());
+
+                chat = connection.getChatById(getId());
+            }
+        }
+
+        if (!chat.isConnected())
+            throw new IllegalStateException("chat not connected: " + getId());
+
+        return chat;
     }
 
     public void setId(String id) {
@@ -64,19 +104,13 @@ public class Conversation {
         return platform;
     }
 
-    public void setPlatform(Platform platform) {
-        this.platform = platform;
-    }
-
+    @Override
     public Entity getEntity() {
         return entity;
     }
 
-    public void setEntity(Entity entity) {
-        this.entity = entity;
-    }
-
-    public int getConversationId() {
-        return conversationId;
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(conversationId);
     }
 }

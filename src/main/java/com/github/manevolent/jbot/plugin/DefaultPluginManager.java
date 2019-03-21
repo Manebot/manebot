@@ -1,10 +1,7 @@
 package com.github.manevolent.jbot.plugin;
 
 import com.github.manevolent.jbot.JBot;
-import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
-import com.github.manevolent.jbot.artifact.ArtifactRepository;
-import com.github.manevolent.jbot.artifact.ArtifactRepositoryException;
-import com.github.manevolent.jbot.artifact.LocalArtifact;
+import com.github.manevolent.jbot.artifact.*;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.database.DatabaseManager;
 import com.github.manevolent.jbot.event.EventExecutionException;
@@ -13,6 +10,7 @@ import com.github.manevolent.jbot.event.plugin.PluginRegisteredEvent;
 import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.io.FileNotFoundException;
 import java.sql.SQLException;
@@ -31,6 +29,8 @@ public final class DefaultPluginManager implements PluginManager {
     private final Set<Plugin> plugins = new HashSet<>();
     private final Map<String, Plugin> pluginMap = new LinkedHashMap<>();
 
+    private final Object installLock = new Object();
+
     public DefaultPluginManager(JBot bot,
                                 EventManager eventManager,
                                 DatabaseManager databaseManager,
@@ -46,7 +46,9 @@ public final class DefaultPluginManager implements PluginManager {
                         databaseManager,
                         commandManager,
                         platformManager,
-                        eventManager)
+                        eventManager,
+                        bot.getApiVersion() == null ? null : new DefaultArtifactVersion(bot.getApiVersion().toString())
+                )
         );
     }
 
@@ -60,7 +62,7 @@ public final class DefaultPluginManager implements PluginManager {
         return pluginLoaderRegistry;
     }
 
-    private PluginRegistration getRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
+    private PluginRegistration getOrLoadRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
         PluginRegistration registration = plugin.getRegistration();
 
         if (registration == null)
@@ -107,58 +109,79 @@ public final class DefaultPluginManager implements PluginManager {
     public Collection<PluginRegistration> getPlugins() {
         return Collections.unmodifiableCollection(bot.getSystemDatabase().execute(s -> {
             return s.createQuery(
-                    "SELECT x FROM " + pluginClass.getName(),
+                    "SELECT x FROM " + pluginClass.getName() +" x ",
                     pluginClass
             ).getResultList()
                     .stream()
-                    .map(this::getRegistration)
+                    .map(this::getOrLoadRegistration)
                     .collect(Collectors.toList());
         }));
     }
 
     @Override
-    public PluginRegistration install(ArtifactIdentifier artifactIdentifier) throws IllegalArgumentException {
-        com.github.manevolent.jbot.database.model.Plugin plugin = bot.getSystemDatabase().execute(s -> {
-            return s.createQuery(
-                    "SELECT x FROM " + pluginClass.getName() +
-                    pluginClass.getName() + " x " +
-                    "WHERE x.packageId = :packageId and x.artifactId = :artifactId",
-                    pluginClass
-            ).getResultList()
-                    .stream()
-                    .findFirst()
-                    .orElse(null);
-        });
+    public PluginRegistration install(ArtifactIdentifier artifactIdentifier)
+            throws IllegalArgumentException, PluginLoadException {
+        com.github.manevolent.jbot.database.model.Plugin plugin;
 
-        if (plugin == null) {
-            try {
-                plugin = bot.getSystemDatabase().executeTransaction(s -> {
-                    com.github.manevolent.jbot.database.model.Plugin newPlugin =
-                            new com.github.manevolent.jbot.database.model.Plugin(
-                                    bot.getSystemDatabase(),
-                                    artifactIdentifier
-                            );
+        synchronized (installLock) {
+             plugin = bot.getSystemDatabase().execute(s -> {
+                return s.createQuery(
+                        "SELECT x FROM " + pluginClass.getName() + " x " +
+                                "WHERE x.packageId = :packageId and x.artifactId = :artifactId",
+                        pluginClass
+                )
+                        .setParameter("packageId", artifactIdentifier.getPackageId())
+                        .setParameter("artifactId", artifactIdentifier.getArtifactId())
+                        .getResultList()
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
+            });
 
-                    s.persist(newPlugin);
+            if (plugin == null) {
+                final PluginRegistration registration =
+                        new DefaultPluginRegistration(
+                                bot,
+                                this,
+                                artifactIdentifier,
+                                () -> load(artifactIdentifier)
+                        );
 
-                    return newPlugin;
-                });
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
+                Plugin instance = registration.load();
+                if (instance == null) throw new NullPointerException();
+
+                try {
+                    plugin = bot.getSystemDatabase().executeTransaction(s -> {
+
+                        com.github.manevolent.jbot.database.model.Plugin newPlugin =
+                                new com.github.manevolent.jbot.database.model.Plugin(
+                                        bot.getSystemDatabase(),
+                                        artifactIdentifier
+                                );
+
+                        s.persist(newPlugin);
+
+                        newPlugin.setRegistration(registration);
+
+                        return newPlugin;
+                    });
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+               /* if (!plugin.getArtifactIdentifier().getVersion().equals(artifactIdentifier.getVersion()))
+                    throw new IllegalStateException(
+                            "Another version of " + artifactIdentifier.toString()
+                                    + " is already installed: " + plugin.getArtifactIdentifier().getVersion());
+                else
+                    throw new IllegalStateException(
+                            "Plugin already installed: " + plugin.getArtifactIdentifier()
+                    );
+                */
             }
-        } else {
-           /* if (!plugin.getArtifactIdentifier().getVersion().equals(artifactIdentifier.getVersion()))
-                throw new IllegalStateException(
-                        "Another version of " + artifactIdentifier.toString()
-                                + " is already installed: " + plugin.getArtifactIdentifier().getVersion());
-            else
-                throw new IllegalStateException(
-                        "Plugin already installed: " + plugin.getArtifactIdentifier()
-                );
-            */
         }
 
-        return getRegistration(plugin);
+        return getOrLoadRegistration(plugin);
     }
 
     @Override
@@ -168,6 +191,15 @@ public final class DefaultPluginManager implements PluginManager {
 
     @Override
     public ArtifactIdentifier resolveIdentifier(String s) {
-        return ArtifactIdentifier.fromString(s);
+        try {
+            return ArtifactIdentifier.fromString(s);
+        } catch (IllegalArgumentException ex) {
+            ManifestIdentifier manifestIdentifier = ManifestIdentifier.fromString(s);
+            try {
+                return getRepostiory().getManifest(manifestIdentifier).getLatestVersion();
+            } catch (ArtifactRepositoryException e) {
+                throw new IllegalArgumentException("Problem resolving identifier", e);
+            }
+        }
     }
 }

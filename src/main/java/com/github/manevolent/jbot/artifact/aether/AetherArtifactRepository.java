@@ -17,6 +17,7 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.eclipse.aether.version.Version;
 
 import java.io.File;
 import java.net.URI;
@@ -34,7 +35,6 @@ public class AetherArtifactRepository implements ArtifactRepository {
     private final LocalRepository localRepository;
     private final List<RemoteRepository> remoteRepositories;
     private final RepositorySystem system;
-    private final RepositorySystemSession session;
 
     public AetherArtifactRepository(
             List<RemoteRepository> remoteRepositories,
@@ -44,7 +44,6 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
         this.system = newRepositorySystem();
         this.localRepository = newLocalRepository(baseDir);
-        this.session = newSession(system, localRepository);
     }
 
     @Override
@@ -94,8 +93,13 @@ public class AetherArtifactRepository implements ArtifactRepository {
             );
 
             try {
-                VersionRangeResult versionResult = system.resolveVersionRange(session, request);
-                return manifestIdentifier.withVersion(versionResult.getHighestVersion().toString());
+                VersionRangeResult versionResult = system.resolveVersionRange(
+                        newSession(system, localRepository),
+                        request
+                );
+                Version highestVersion = versionResult.getHighestVersion();
+                if (highestVersion == null) return null;
+                return manifestIdentifier.withVersion(highestVersion.toString());
             } catch (VersionRangeResolutionException e) {
                 return null;
             }
@@ -114,7 +118,10 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
             ArtifactDescriptorResult result;
             try {
-                result = system.readArtifactDescriptor(session, request);
+                result = system.readArtifactDescriptor(
+                        newSession(system, localRepository),
+                        request
+                );
             } catch (ArtifactDescriptorException e) {
                 throw new ArtifactNotFoundException(e);
             }
@@ -131,7 +138,10 @@ public class AetherArtifactRepository implements ArtifactRepository {
             );
 
             try {
-                VersionRangeResult versionResult = system.resolveVersionRange(session, request);
+                VersionRangeResult versionResult = system.resolveVersionRange(
+                        newSession(system, localRepository),
+                        request
+                );
 
                 return Collections.unmodifiableList(versionResult.getVersions().stream()
                         .map(org.eclipse.aether.version.Version::toString)
@@ -200,7 +210,29 @@ public class AetherArtifactRepository implements ArtifactRepository {
         }
 
         @Override
-        public LocalArtifact obtain() throws ArtifactRepositoryException, ArtifactNotFoundException {
+        public boolean hasObtained() {
+            ArtifactRequest request = new ArtifactRequest();
+
+            request.setArtifact(descriptor.getArtifact());
+
+            request.setRepositories(Collections.emptyList());
+
+            ArtifactResult result;
+
+            try {
+                result = system.resolveArtifact(
+                        newSession(system, localRepository),
+                        request
+                );
+
+                return result.isResolved();
+            } catch (ArtifactResolutionException e) {
+                return false;
+            }
+        }
+
+        @Override
+        public LocalArtifact obtain() throws ArtifactRepositoryException {
             ArtifactRequest request = new ArtifactRequest();
 
             request.setArtifact(descriptor.getArtifact());
@@ -218,8 +250,12 @@ public class AetherArtifactRepository implements ArtifactRepository {
             );
 
             ArtifactResult result;
+
             try {
-                result = system.resolveArtifact(session, request);
+                result = system.resolveArtifact(
+                        newSession(system, localRepository),
+                        request
+                );
             } catch (ArtifactResolutionException e) {
                 throw new ArtifactRepositoryException(e);
             }
@@ -234,13 +270,16 @@ public class AetherArtifactRepository implements ArtifactRepository {
             for (Dependency dependency : descriptor.getDependencies()) {
                 ArtifactDescriptorRequest request = new ArtifactDescriptorRequest();
 
-                request.setArtifact(new DefaultArtifact(dependency.getArtifact().getClassifier()));
+                request.setArtifact(dependency.getArtifact());
 
                 request.setRepositories(AetherArtifactRepository.this.remoteRepositories);
 
                 ArtifactDescriptorResult result;
                 try {
-                    result = system.readArtifactDescriptor(session, request);
+                    result = system.readArtifactDescriptor(
+                            newSession(system, localRepository),
+                            request
+                    );
                 } catch (ArtifactDescriptorException e) {
                     throw new RuntimeException(e);
                 }
@@ -256,7 +295,8 @@ public class AetherArtifactRepository implements ArtifactRepository {
                                 dependency.getArtifact().getVersion(),
                                 result
                         ),
-                        getDependencyLevelFromScope(dependency.getScope())
+                        getDependencyLevelFromScope(dependency.getScope()),
+                        !dependency.isOptional()
                 ));
             }
 
@@ -312,11 +352,16 @@ public class AetherArtifactRepository implements ArtifactRepository {
     private class AetherDependency implements ArtifactDependency {
         private final AetherArtifact parent, child;
         private final ArtifactDependencyLevel level;
+        private final boolean required;
 
-        private AetherDependency(AetherArtifact parent, AetherArtifact child, ArtifactDependencyLevel level) {
+        private AetherDependency(AetherArtifact parent,
+                                 AetherArtifact child,
+                                 ArtifactDependencyLevel level,
+                                 boolean required) {
             this.parent = parent;
             this.child = child;
             this.level = level;
+            this.required = required;
         }
 
         @Override
@@ -333,6 +378,11 @@ public class AetherArtifactRepository implements ArtifactRepository {
         public ArtifactDependencyLevel getType() {
             return level;
         }
+
+        @Override
+        public boolean isRequired() {
+            return required;
+        }
     }
 
     private static ArtifactDependencyLevel getDependencyLevelFromScope(String scope) {
@@ -345,6 +395,8 @@ public class AetherArtifactRepository implements ArtifactRepository {
                 return ArtifactDependencyLevel.PROVIDED;
             case "test":
                 return ArtifactDependencyLevel.TEST;
+            case "system":
+                return ArtifactDependencyLevel.SYSTEM;
             default:
                 throw new IllegalArgumentException("unsupported dependency scope: " + scope);
         }

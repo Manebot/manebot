@@ -1,5 +1,7 @@
+import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
 import com.github.manevolent.jbot.artifact.ArtifactManifest;
 import com.github.manevolent.jbot.artifact.LocalArtifact;
+import com.github.manevolent.jbot.artifact.ManifestIdentifier;
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
 import junit.framework.TestCase;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -31,6 +33,12 @@ public class ArtifactEqualityTest extends TestCase {
             LocalArtifact b = manifest.getArtifact(artifactVersion).obtain();
             assertEquals(a, b);
         }
+
+        ArtifactIdentifier manifestIdentifier = new ArtifactIdentifier("com.github.manevolent", "jbot-test", "1.0");
+        Collection<ManifestIdentifier> manifestIdentifiers =
+                Collections.singletonList(manifestIdentifier.withoutVersion());
+
+        assertTrue(manifestIdentifiers.contains(manifestIdentifier.withoutVersion()));
     }
 
 }

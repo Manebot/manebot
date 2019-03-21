@@ -9,6 +9,7 @@ import com.github.manevolent.jbot.command.CommandDispatcher;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
 import com.github.manevolent.jbot.command.DefaultCommandManager;
+import com.github.manevolent.jbot.command.builtin.PluginCommand;
 import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
 import com.github.manevolent.jbot.conversation.DefaultConversationProvider;
@@ -381,6 +382,8 @@ public final class JBot implements Bot, Runnable {
                 bot.commandManager,
                 bot.platformManager
         );
+
+        bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager));
 
         Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
         PlatformRegistration consolePlatformRegistration = platformBuilder

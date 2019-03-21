@@ -81,7 +81,7 @@ public class AsyncCommandShell extends CommandShell implements Runnable {
                     break;
                 }
 
-                if (asyncCommand == null) throw new NullPointerException();
+                if (asyncCommand == null) break;
 
                 try {
                     handleCommand(asyncCommand.getMessage());

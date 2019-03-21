@@ -1,5 +1,6 @@
 package com.github.manevolent.jbot.plugin.java.classloader;
 
+import com.github.manevolent.jbot.plugin.java.JavaPluginDependency;
 import com.github.manevolent.jbot.plugin.java.JavaPluginInstance;
 import sun.misc.IOUtils;
 import sun.misc.Resource;
@@ -125,11 +126,11 @@ public final class JavaPluginClassLoader extends ClassLoader implements LocalCla
             URL url = getLocalResource(name);
             if (url != null) return url;
 
-            for (JavaPluginInstance pluginInstance : instance.getDependencies()) {
-                if (pluginInstance == instance && pluginInstance.isLoaded()) continue;
+            for (JavaPluginDependency dependency : instance.getDependencies()) {
+                if (dependency.getInstance() == instance && dependency.getInstance().isLoaded()) continue;
 
                 // Load resource on classLoader.
-                url = pluginInstance.getClassLoader().getLocalResource(name);
+                url = dependency.getInstance().getClassLoader().getLocalResource(name);
 
                 if (url != null) {
                     return url;
@@ -203,12 +204,12 @@ public final class JavaPluginClassLoader extends ClassLoader implements LocalCla
                 }
             } catch (ClassNotFoundException ex2) {
                 // Attempt to find class in dependency tree
-                for (JavaPluginInstance pluginInstance : instance.getDependencies()) {
-                    if (pluginInstance == instance && pluginInstance.isLoaded()) continue;
+                for (JavaPluginDependency dependency : instance.getDependencies()) {
+                    if (dependency.getInstance() == instance && dependency.getInstance().isLoaded()) continue;
 
                     try {
                         // Load class on classLoader.
-                        c = pluginInstance.getClassLoader().loadCachedLocalClass(name);
+                        c = dependency.getInstance().getClassLoader().loadCachedLocalClass(name);
                         if (c != null) {
                             synchronized (classLoadLock) {
                                 localClassMap.put(name, c);

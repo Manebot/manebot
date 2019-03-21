@@ -97,8 +97,9 @@ public final class JavaPlugin implements Plugin, EventListener {
     @Override
     public <T extends PluginReference> T getInstance(Class<? extends T> aClass) {
         if (!isEnabled()) throw new IllegalStateException("Plugin not enabled");
-
-        return (T) instances.get(aClass);
+        Object instance =  instances.get(aClass);
+        if (instance == null) return (T) null;
+        else return (T) instance;
     }
 
     @Override
@@ -140,7 +141,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         return enabled;
     }
 
-    protected void onEnable() throws PluginException {
+    private void onEnable() throws PluginException {
         // Register platforms
         for (Function<Platform.Builder, PlatformRegistration> function : platformBuilders) {
             Platform.Builder builder = platformManager.buildPlatform();
@@ -168,9 +169,9 @@ public final class JavaPlugin implements Plugin, EventListener {
             function.call();
     }
 
-    protected void onEnabled() throws PluginException { }
+    private void onEnabled() throws PluginException { }
 
-    protected void onDisable() throws PluginException {
+    private void onDisable() throws PluginException {
         // Unregister commands
         Iterator<PlatformRegistration> commandIterator = platforms.iterator();
         while (commandIterator.hasNext()) {
@@ -205,7 +206,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
     }
 
-    protected void onDisabled() throws PluginException {
+    private void onDisabled() throws PluginException {
         // Call all disables
         for (PluginFunction function : disable)
             function.call();

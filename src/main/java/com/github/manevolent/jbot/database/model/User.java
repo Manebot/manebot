@@ -75,7 +75,7 @@ public class User extends TimedRow implements
     private Set<UserAssociation> userAssociations;
 
     public String getDisplayName() {
-        return displayName;
+        return displayName == null ? username : displayName;
     }
 
     @Override

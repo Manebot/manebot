@@ -19,11 +19,11 @@ public class DefaultPlatformManager implements PlatformManager {
     }
 
     @Override
-    public Builder buildPlatform() {
-        return new Builder() {
+    public Platform.Builder buildPlatform() {
+        return new Platform.Builder() {
             private com.github.manevolent.jbot.database.model.Platform platform;
 
-            public Builder id(String id) {
+            public Platform.Builder id(String id) {
                 this.platform = getOrCreatePlatformById(id);
                 super.id(id);
                 return this;
@@ -153,7 +153,7 @@ public class DefaultPlatformManager implements PlatformManager {
         private final Platform platform;
         private final Plugin plugin;
 
-        private DefaultPlatformRegistration(Platform platform, Builder builder, Plugin plugin) {
+        private DefaultPlatformRegistration(Platform platform, Platform.Builder builder, Plugin plugin) {
             this.name = builder.getName();
             this.connection = builder.getConnection();
             this.platform = platform;

@@ -27,7 +27,7 @@ public class ArtifactLatestVersionTest extends TestCase {
 
         ArtifactManifest manifest = repository.getManifest("com.google.code.gson", "gson");
         Artifact artifact;
-        assertNotNull(artifact = manifest.getArtifact(manifest.getLatestVersion()));
+        assertNotNull(artifact = manifest.getArtifact(manifest.getLatestVersion().getVersion()));
 
         System.out.println(artifact.getVersion());
     }

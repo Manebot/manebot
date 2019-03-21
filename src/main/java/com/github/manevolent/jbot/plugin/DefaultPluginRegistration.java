@@ -1,10 +1,12 @@
 package com.github.manevolent.jbot.plugin;
 
+import com.github.manevolent.jbot.Bot;
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
 
 import java.util.concurrent.Callable;
 
 public class DefaultPluginRegistration implements PluginRegistration {
+    private final Bot bot;
     private final PluginManager pluginManager;
     private final Callable<Plugin> loader;
     private final ArtifactIdentifier identifier;
@@ -12,12 +14,19 @@ public class DefaultPluginRegistration implements PluginRegistration {
     private final Object loadLock = new Object();
     private Plugin instance;
 
-    public DefaultPluginRegistration(PluginManager pluginManager,
+    public DefaultPluginRegistration(Bot bot,
+                                     PluginManager pluginManager,
                                      ArtifactIdentifier identifier,
                                      Callable<Plugin> loader) {
+        this.bot = bot;
         this.pluginManager = pluginManager;
         this.loader = loader;
         this.identifier = identifier;
+    }
+
+    @Override
+    public Bot getBot() {
+        return bot;
     }
 
     @Override

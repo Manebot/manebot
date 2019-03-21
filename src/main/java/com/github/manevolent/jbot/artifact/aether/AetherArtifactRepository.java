@@ -61,10 +61,18 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
     private class AetherManifest implements ArtifactManifest {
         private final String packageId, artifactId;
+        private final ManifestIdentifier manifestIdentifier;
 
         private AetherManifest(String packageId, String artifactId) {
             this.packageId = packageId;
             this.artifactId = artifactId;
+
+            this.manifestIdentifier = new ManifestIdentifier(packageId, artifactId);
+        }
+
+        @Override
+        public ManifestIdentifier getIdentifier() {
+            return manifestIdentifier;
         }
 
         @Override
@@ -78,7 +86,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
         }
 
         @Override
-        public String getLatestVersion() {
+        public ArtifactIdentifier getLatestVersion() {
             VersionRangeRequest request = new VersionRangeRequest(
                     new DefaultArtifact(packageId + ":" + artifactId + ":(0,]"),
                     remoteRepositories,
@@ -87,8 +95,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
             try {
                 VersionRangeResult versionResult = system.resolveVersionRange(session, request);
-
-                return versionResult.getHighestVersion().toString();
+                return manifestIdentifier.withVersion(versionResult.getHighestVersion().toString());
             } catch (VersionRangeResolutionException e) {
                 return null;
             }
@@ -151,6 +158,8 @@ public class AetherArtifactRepository implements ArtifactRepository {
         private final AetherManifest manifest;
         private final String version;
 
+        private final ArtifactIdentifier identifier;
+
         /**
          * Collection of parent repositories for obtain()
          */
@@ -166,6 +175,13 @@ public class AetherArtifactRepository implements ArtifactRepository {
             this.version = version;
 
             this.descriptor = descriptor;
+
+            this.identifier = manifest.getIdentifier().withVersion(version);
+        }
+
+        @Override
+        public ArtifactIdentifier getIdentifier() {
+            return identifier;
         }
 
         @Override

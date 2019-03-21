@@ -1,8 +1,12 @@
 package com.github.manevolent.jbot.plugin.java;
 
 import com.github.manevolent.jbot.artifact.*;
-import com.github.manevolent.jbot.plugin.DefaultPluginManager;
+import com.github.manevolent.jbot.command.CommandManager;
+import com.github.manevolent.jbot.database.DatabaseManager;
+import com.github.manevolent.jbot.event.EventManager;
+import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.plugin.Plugin;
+import com.github.manevolent.jbot.plugin.PluginException;
 import com.github.manevolent.jbot.plugin.PluginLoadException;
 
 import com.github.manevolent.jbot.plugin.PluginManager;
@@ -23,10 +27,23 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public final class JavaPluginLoader implements PluginLoader {
-    private Map<ArtifactIdentifier, JavaPluginInstance> pluginInstances = new LinkedHashMap<>();
+    private final PluginManager pluginManager;
+    private final DatabaseManager databaseManager;
+    private final CommandManager commandManager;
+    private final PlatformManager platformManager;
+    private final EventManager eventManager;
+    private final Map<ArtifactIdentifier, JavaPluginInstance> pluginInstances = new LinkedHashMap<>();
 
-    public JavaPluginLoader(PluginManager pluginManager) {
-
+    public JavaPluginLoader(PluginManager pluginManager,
+                            DatabaseManager databaseManager,
+                            CommandManager commandManager,
+                            PlatformManager platformManager,
+                            EventManager eventManager) {
+        this.pluginManager = pluginManager;
+        this.databaseManager = databaseManager;
+        this.commandManager = commandManager;
+        this.platformManager = platformManager;
+        this.eventManager = eventManager;
     }
 
     @Override
@@ -131,11 +148,11 @@ public final class JavaPluginLoader implements PluginLoader {
         // Define a future task for plugin loading.  This lambda is executed by JavaPluginInstance to load a plugin.
         Loader loader = classLoader -> {
             // Load plugin on a separate thread so that setContextClassLoader() works appropriately.
-            CompletableFuture<Plugin> loaderFuture = new CompletableFuture<>();
+            CompletableFuture<PluginEntry> loaderFuture = new CompletableFuture<>();
 
             new Thread(() -> {
                 try {
-                    Class<? extends Plugin> pluginClass;
+                    Class<? extends PluginEntry> pluginEntryClass;
 
                     Thread.currentThread().setContextClassLoader(pluginClassLoader);
 
@@ -143,44 +160,54 @@ public final class JavaPluginLoader implements PluginLoader {
                         Class<?> clazz = pluginClassLoader.loadClass(className);
                         if (clazz == null) throw new NullPointerException();
 
-                        if (!Plugin.class.isAssignableFrom(clazz))
+                        if (!PluginEntry.class.isAssignableFrom(clazz))
                             throw new PluginLoadException(
                                     "class " + clazz.getName() + " not assignable from " + Plugin.class.getName()
                             );
 
                         // Cast (ignore that unsuppressed warning, we already check that previously/at runtime)
-                        pluginClass = (Class<? extends Plugin>) clazz;
+                        pluginEntryClass = (Class<? extends PluginEntry>) clazz;
                     } catch (ClassNotFoundException e) {
                         throw new PluginLoadException(e);
                     }
 
 
-                    Plugin plugin;
+                    PluginEntry pluginEntry;
 
                     try {
-                        plugin = pluginClass.getConstructor(LocalArtifact.class).newInstance(artifact);
+                        pluginEntry = pluginEntryClass.newInstance();
                     } catch (ReflectiveOperationException e) {
-                        throw new PluginLoadException("instantiating new instance of " + pluginClass.getName(), e);
+                        throw new PluginLoadException("instantiating new instance of " + pluginEntryClass.getName(), e);
                     }
 
-                    loaderFuture.complete(plugin);
+                    loaderFuture.complete(pluginEntry);
                 } catch (Throwable e) {
                     loaderFuture.completeExceptionally(e);
                 }
             }).start();
 
             // wait for execution to complete (join).
-            final Plugin plugin;
+            final PluginEntry pluginEntry;
 
             try {
-                plugin = loaderFuture.get();
+                pluginEntry = loaderFuture.get();
             } catch (InterruptedException e) {
                 throw new PluginLoadException("interrupted while waiting for plugin load to complete", e);
             } catch (ExecutionException e) {
                 throw new PluginLoadException(e);
             }
 
-            return plugin;
+            Plugin.Builder builder = new JavaPlugin.Builder(
+                    platformManager, commandManager, pluginManager, databaseManager, eventManager,
+                    artifact,
+                    null // TODO
+            );
+
+            try {
+                return pluginEntry.instantiate(builder);
+            } catch (PluginException e) {
+                throw new PluginLoadException(e);
+            }
         };
 
         JavaPluginInstance instance = new JavaPluginInstance(

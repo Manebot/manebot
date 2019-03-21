@@ -38,7 +38,7 @@
         <dependency>
             <groupId>com.github.manevolent</groupId>
             <artifactId>jbot-core</artifactId>
-            <version>ab16b6230fcf20f0dfffc0a6aa64bc1d39c3c7e4</version>
+            <version>46cdd80bf3e6791ec28b5d21a792b84976668599</version>
         </dependency>
 
         <dependency>

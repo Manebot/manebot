@@ -49,7 +49,7 @@ public final class JBot implements Bot, Runnable {
     private final CommandDispatcher commandDispatcher = new DefaultCommandDispatcher(commandManager, eventDispatcher);
     private final ConversationProvider conversationProvider = new DefaultConversationProvider(this);
     private final ChatDispatcher chatDispatcher = new DefaultChatDispatcher(this);
-    private final DefaultPluginManager pluginManager = new DefaultPluginManager(this, eventManager);
+    private DefaultPluginManager pluginManager;
 
     private final List<Consumer<BotState>> stateListeners = new LinkedList<>();
 
@@ -374,7 +374,15 @@ public final class JBot implements Bot, Runnable {
 
         Virtual.setInstance(new DefaultVirtual(user));
 
-        PlatformManager.Builder platformBuilder = bot.platformManager.buildPlatform();
+        bot.pluginManager = new DefaultPluginManager(
+                bot,
+                bot.eventManager,
+                bot.databaseManager,
+                bot.commandManager,
+                bot.platformManager
+        );
+
+        Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
         PlatformRegistration consolePlatformRegistration = platformBuilder
                 .id("console").name("Console")
                 .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))

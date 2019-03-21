@@ -5,10 +5,12 @@ import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
 import com.github.manevolent.jbot.artifact.ArtifactRepository;
 import com.github.manevolent.jbot.artifact.ArtifactRepositoryException;
 import com.github.manevolent.jbot.artifact.LocalArtifact;
+import com.github.manevolent.jbot.command.CommandManager;
+import com.github.manevolent.jbot.database.DatabaseManager;
 import com.github.manevolent.jbot.event.EventExecutionException;
-import com.github.manevolent.jbot.event.EventListener;
 import com.github.manevolent.jbot.event.EventManager;
 import com.github.manevolent.jbot.event.plugin.PluginRegisteredEvent;
+import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
 
@@ -29,11 +31,23 @@ public final class DefaultPluginManager implements PluginManager {
     private final Set<Plugin> plugins = new HashSet<>();
     private final Map<String, Plugin> pluginMap = new LinkedHashMap<>();
 
-    public DefaultPluginManager(JBot bot, EventManager eventManager) {
+    public DefaultPluginManager(JBot bot,
+                                EventManager eventManager,
+                                DatabaseManager databaseManager,
+                                CommandManager commandManager,
+                                PlatformManager platformManager
+    ) {
         this.bot = bot;
         this.eventManager = eventManager;
         this.pluginLoaderRegistry = new PluginLoaderRegistry();
-        pluginLoaderRegistry.registerLoader("jar", new JavaPluginLoader(this));
+        this.pluginLoaderRegistry.registerLoader("jar",
+                new JavaPluginLoader(
+                        this,
+                        databaseManager,
+                        commandManager,
+                        platformManager,
+                        eventManager)
+        );
     }
 
     @Override
@@ -46,11 +60,12 @@ public final class DefaultPluginManager implements PluginManager {
         return pluginLoaderRegistry;
     }
 
-    private final PluginRegistration getRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
+    private PluginRegistration getRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
         PluginRegistration registration = plugin.getRegistration();
 
         if (registration == null)
             plugin.setRegistration(registration = new DefaultPluginRegistration(
+                    bot,
                     this,
                     plugin.getArtifactIdentifier(),
                     () -> load(plugin.getArtifactIdentifier())
@@ -117,7 +132,7 @@ public final class DefaultPluginManager implements PluginManager {
 
         if (plugin == null) {
             try {
-                return getRegistration(bot.getSystemDatabase().executeTransaction(s -> {
+                plugin = bot.getSystemDatabase().executeTransaction(s -> {
                     com.github.manevolent.jbot.database.model.Plugin newPlugin =
                             new com.github.manevolent.jbot.database.model.Plugin(
                                     bot.getSystemDatabase(),
@@ -127,12 +142,12 @@ public final class DefaultPluginManager implements PluginManager {
                     s.persist(newPlugin);
 
                     return newPlugin;
-                }));
+                });
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
         } else {
-            if (!plugin.getArtifactIdentifier().getVersion().equals(artifactIdentifier.getVersion()))
+           /* if (!plugin.getArtifactIdentifier().getVersion().equals(artifactIdentifier.getVersion()))
                 throw new IllegalStateException(
                         "Another version of " + artifactIdentifier.toString()
                                 + " is already installed: " + plugin.getArtifactIdentifier().getVersion());
@@ -140,7 +155,10 @@ public final class DefaultPluginManager implements PluginManager {
                 throw new IllegalStateException(
                         "Plugin already installed: " + plugin.getArtifactIdentifier()
                 );
+            */
         }
+
+        return getRegistration(plugin);
     }
 
     @Override

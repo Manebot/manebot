@@ -1,9 +1,13 @@
 package com.github.manevolent.jbot.database.model;
 
 import com.github.manevolent.jbot.user.UserGroup;
+import com.github.manevolent.jbot.user.UserGroupMembership;
+import com.github.manevolent.jbot.user.UserType;
+import com.github.manevolent.jbot.virtual.Virtual;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
@@ -28,6 +32,13 @@ public class Group extends TimedRow implements UserGroup {
     public Group(com.github.manevolent.jbot.database.Database database) {
         this.database = database;
     }
+    public Group(com.github.manevolent.jbot.database.Database database, Entity entity, String name, User owner) {
+        this(database);
+
+        this.entity = entity;
+        this.name = name;
+        this.owningUser = owner;
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,9 +55,6 @@ public class Group extends TimedRow implements UserGroup {
     @ManyToOne(optional = false)
     @JoinColumn(name = "entityId")
     private Entity entity;
-
-    @OneToMany(mappedBy = "group")
-    private Set<com.github.manevolent.jbot.database.model.UserGroup> userGroups;
 
     public Entity getEntity() {
         return entity;
@@ -66,22 +74,59 @@ public class Group extends TimedRow implements UserGroup {
     }
 
     @Override
-    public Collection<com.github.manevolent.jbot.user.User> getUsers() {
-        return Collections.unmodifiableCollection(
-                userGroups.stream()
-                .map(com.github.manevolent.jbot.database.model.UserGroup::getUser)
-                .collect(Collectors.toList())
-        );
+    public Collection<UserGroupMembership> getMembership() {
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserGroup.class.getName() + " x " +
+                            "inner join x.group g "+
+                            "where g.groupId = :groupId",
+                    com.github.manevolent.jbot.database.model.UserGroup.class
+            ).setParameter("groupId", getGroupId()).getResultList();
+        }));
+    }
+
+    @Override
+    public UserGroupMembership getMembership(com.github.manevolent.jbot.user.User user) {
+        return database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserGroup.class.getName() + " x " +
+                            "inner join x.user u " +
+                            "inner join x.group g " +
+                            "where u.userId = :userId and g.groupId = :groupId",
+                    com.github.manevolent.jbot.database.model.UserGroup.class
+            )
+                    .setParameter("userId", ((User)user).getUserId())
+                    .setParameter("groupId", this.getGroupId())
+                    .getResultList()
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        });
     }
 
     @Override
     public void addUser(com.github.manevolent.jbot.user.User user) throws SecurityException {
+        User addingUser = (User) Virtual.getInstance().currentProcess().getUser();
+        if (addingUser.getType() != UserType.SYSTEM && getOwner() != addingUser)
+            throw new SecurityException("Cannot control group");
 
-    }
+        try {
+            database.executeTransaction(s -> {
+                com.github.manevolent.jbot.database.model.UserGroup userGroup =
+                        new com.github.manevolent.jbot.database.model.UserGroup(
+                                database,
+                                (User) user,
+                                this,
+                                addingUser
+                        );
 
-    @Override
-    public void removeUser(com.github.manevolent.jbot.user.User user) throws SecurityException {
+                s.persist(userGroup);
 
+                return userGroup;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void setName(String name) {
@@ -92,12 +137,20 @@ public class Group extends TimedRow implements UserGroup {
         return groupId;
     }
 
-    public User getOwningUser() {
-        return owningUser;
-    }
+    @Override
+    public void setOwner(com.github.manevolent.jbot.user.User user) {
+        User addingUser = (User) Virtual.getInstance().currentProcess().getUser();
+        if (addingUser.getType() != UserType.SYSTEM && getOwner() != addingUser)
+            throw new SecurityException("Cannot control group");
 
-    public void setOwningUser(User owningUser) {
-        this.owningUser = owningUser;
+        try {
+            database.executeTransaction(s -> {
+                Group group = s.find(Group.class, getGroupId());
+                group.owningUser = owningUser;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

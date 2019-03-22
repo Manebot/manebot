@@ -2,36 +2,39 @@ package com.github.manevolent.jbot.command;
 
 import com.github.manevolent.jbot.command.executor.CommandExecutor;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 public final class DefaultCommandManager extends CommandManager {
-    private Map<String, CommandExecutor> executorMap = new LinkedHashMap<>();
+    private final Map<String, Registration> registrations = new LinkedHashMap<>();
     private final Object registrationLock = new Object();
-
-    public Map<String, CommandExecutor> getExecutors() {
-        return executorMap;
-    }
 
     @Override
     public Registration registerExecutor(String label, CommandExecutor executor) {
         synchronized (registrationLock) {
-            if (executorMap.containsKey(label))
+            if (registrations.containsKey(label))
                 throw new IllegalArgumentException("command " + label + " already exists.");
-            executorMap.put(label, executor);
-            return new Registration(executor, label);
+            Registration registration = new Registration(executor, label);
+            registrations.put(label, registration);
+            return registration;
         }
     }
 
     @Override
     public void unregisterExecutor(String label) {
         synchronized (registrationLock) {
-            executorMap.remove(label);
+            registrations.remove(label);
         }
     }
 
     @Override
     public CommandExecutor getExecutor(String label) {
-        return executorMap.get(label);
+        Registration registration = registrations.get(label);
+        if (registration == null) return null;
+        return registration.getExecutor();
+    }
+
+    @Override
+    public Collection<Registration> getRegistrations() {
+        return Collections.unmodifiableCollection(registrations.values());
     }
 }

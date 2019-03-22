@@ -89,6 +89,12 @@ public final class JavaPlugin implements Plugin, EventListener {
         return Collections.unmodifiableCollection(commandExecutors.keySet());
     }
 
+    // Override to improve performance of this method, because we do have a map.
+    @Override
+    public Plugin getDependentPlugin(ManifestIdentifier identifier) {
+        return dependencyMap.get(identifier);
+    }
+
     @Override
     public final String getName() {
         return artifact.getManifest().getArtifactId().toLowerCase();
@@ -173,9 +179,9 @@ public final class JavaPlugin implements Plugin, EventListener {
 
     private void onDisable() throws PluginException {
         // Unregister commands
-        Iterator<PlatformRegistration> commandIterator = platforms.iterator();
+        Iterator<CommandManager.Registration> commandIterator = registeredCommands.iterator();
         while (commandIterator.hasNext()) {
-            commandManager.unregisterExecutor(commandIterator.next().getName());
+            commandManager.unregisterExecutor(commandIterator.next().getLabel());
             commandIterator.remove();
         }
 

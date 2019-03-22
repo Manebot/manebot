@@ -6,7 +6,7 @@
 
     <groupId>com.github.manevolent.jbot</groupId>
     <artifactId>jbot</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1</version>
 
     <repositories>
         <repository>
@@ -16,12 +16,31 @@
     </repositories>
 
     <properties>
+        <apiVersion>0.1.1</apiVersion>
+        <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
         <mavenVersion>3.3.9</mavenVersion>
         <jline.version>3.10.0</jline.version>
     </properties>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/build.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/build.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -31,6 +50,24 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.5</version>
+
+                <configuration>
+                    <archive>
+                        <index>true</index>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <mainClass>com.github.manevolent.jbot.JBot</mainClass>
+                        </manifest>
+                        <manifestEntries>
+                            <Implementation-Build>$\{buildNumber}</Implementation-Build>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -38,7 +75,7 @@
         <dependency>
             <groupId>com.github.manevolent</groupId>
             <artifactId>jbot-core</artifactId>
-            <version>cbd32bb07e6b6c9ae96c9917e5cc298af9b0a771</version>
+            <version>1afa81aeadd1a745722b7f382cbfd0f9cd5e09ed</version>
         </dependency>
 
         <dependency>
@@ -82,7 +119,7 @@
         <dependency>
             <groupId>org.hibernate</groupId>
             <artifactId>hibernate-c3p0</artifactId>
-            <version>5.4.1.Final</version>
+            <version>${hibernateVersion}</version>
         </dependency>
 
         <dependency>

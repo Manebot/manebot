@@ -8,6 +8,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class DefaultPlatformManager implements PlatformManager {
+    private static final Class<com.github.manevolent.jbot.database.model.Platform> platformClass =
+            com.github.manevolent.jbot.database.model.Platform.class;
+
     private final Object platformLock = new Object();
     private final Database systemDatabase;
     private final HashSet<PlatformRegistration> registrations = new HashSet<>();
@@ -83,8 +86,8 @@ public class DefaultPlatformManager implements PlatformManager {
     public Collection<Platform> getPlatforms() {
         return Collections.unmodifiableCollection(systemDatabase.execute(s -> {
             return s.createQuery(
-                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.Platform.class.getName(),
-                    com.github.manevolent.jbot.database.model.Platform.class
+                    "SELECT x FROM " + platformClass.getName() + " x",
+                    platformClass
             ).getResultList()
             .stream()
                     .map(platform -> (Platform) platform)
@@ -96,9 +99,9 @@ public class DefaultPlatformManager implements PlatformManager {
     public com.github.manevolent.jbot.database.model.Platform getPlatformById(String id) {
         return systemDatabase.execute(s -> {
             return s.createQuery(
-                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.Platform.class.getName() + " x "
+                    "SELECT x FROM " + platformClass.getName() + " x "
                     + "WHERE x.id = :id",
-                    com.github.manevolent.jbot.database.model.Platform.class
+                    platformClass
             )
                     .setParameter("id", id)
                     .getResultList()

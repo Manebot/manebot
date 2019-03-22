@@ -9,12 +9,14 @@ import com.github.manevolent.jbot.command.CommandDispatcher;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
 import com.github.manevolent.jbot.command.DefaultCommandManager;
-import com.github.manevolent.jbot.command.builtin.PluginCommand;
+import com.github.manevolent.jbot.command.builtin.*;
 import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
 import com.github.manevolent.jbot.conversation.DefaultConversationProvider;
 import com.github.manevolent.jbot.database.DatabaseManager;
 import com.github.manevolent.jbot.plugin.DefaultPluginManager;
+import com.github.manevolent.jbot.plugin.PluginLoadException;
+import com.github.manevolent.jbot.plugin.PluginRegistration;
 import com.github.manevolent.jbot.user.DefaultUserManager;
 import com.github.manevolent.jbot.database.HibernateManager;
 import com.github.manevolent.jbot.database.model.*;
@@ -44,6 +46,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class JBot implements Bot, Runnable {
+    private static final Version version = BuildInformation.getVersion() == null ?
+            null :
+            Version.fromString(BuildInformation.getVersion());
+
+    private static final Version apiVersion =
+            BuildInformation.getApiVersion() == null ?
+            null :
+            Version.fromString(BuildInformation.getApiVersion());
+
     private final DefaultEventManager eventManager = new DefaultEventManager();
     private final EventDispatcher eventDispatcher = eventManager;
     private final CommandManager commandManager = new DefaultCommandManager();
@@ -66,9 +77,7 @@ public final class JBot implements Bot, Runnable {
     private PlatformManager platformManager;
     private com.github.manevolent.jbot.database.Database systemDatabase;
 
-    private JBot() {
-
-    }
+    private JBot() { }
 
     @Override
     public Collection<Platform> getPlatforms() {
@@ -130,6 +139,8 @@ public final class JBot implements Bot, Runnable {
 
         synchronized (this.stateLock) {
             if (this.state != state) {
+                Logger.getGlobal().info("State " + this.state + " -> " + state);
+
                 switch (state) {
                     case RUNNING:
                         this.started = new Date(System.currentTimeMillis());
@@ -159,17 +170,28 @@ public final class JBot implements Bot, Runnable {
 
             setState(BotState.STARTING);
 
+            for (PluginRegistration plugin : pluginManager.getPlugins()) {
+                try {
+                    plugin.load();
+                } catch (PluginLoadException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
             // Start all auto-start plugins
             for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
                 try {
                     plugin.setEnabled(true);
                 } catch (PluginException e) {
-                    throw new RuntimeException(e);
+                    Logger.getGlobal().log(
+                            Level.WARNING,
+                            "Problem enabling plugin " + plugin.getArtifact().getIdentifier(),
+                            e
+                    );
                 }
             }
 
             setState(BotState.RUNNING);
-            (new Thread(this)).start();
         }
     }
 
@@ -185,6 +207,7 @@ public final class JBot implements Bot, Runnable {
             BotState state = getState();
             if (state != BotState.RUNNING) throw new IllegalStateException(state.name());
 
+            Logger.getGlobal().info("Shutting down...");
             setState(BotState.STOPPING);
 
             try {
@@ -192,11 +215,14 @@ public final class JBot implements Bot, Runnable {
                     try {
                         plugin.setEnabled(false);
                     } catch (PluginException e) {
-                        throw new RuntimeException(e);
+                        Logger.getGlobal().log(Level.WARNING,
+                                "Problem disabling " + plugin.getArtifact().getIdentifier()
+                                        + " during shutdown proceudre", e);
                     }
                 }
             } finally {
                 setState(BotState.STOPPED);
+                Logger.getGlobal().info("Shutdown complete.");
             }
         }
     }
@@ -213,12 +239,12 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public Version getVersion() {
-        return null;
+        return version;
     }
 
     @Override
     public Version getApiVersion() {
-        return null;
+        return apiVersion;
     }
 
     @Override
@@ -239,164 +265,177 @@ public final class JBot implements Bot, Runnable {
 
     public static void main(String[] args)
             throws Exception {
-        Logger logger = Logger.getGlobal();
+        try {
+            Logger logger = Logger.getGlobal();
 
-        logger.setUseParentHandlers(false);
+            logger.setUseParentHandlers(false);
 
-        FileHandler allMessages = new FileHandler("info.log", true);
-        allMessages.setFormatter(new LineLogFormatter());
-        allMessages.setLevel(Level.INFO);
-        logger.addHandler(allMessages);
+            FileHandler allMessages = new FileHandler("info.log", true);
+            allMessages.setFormatter(new LineLogFormatter());
+            allMessages.setLevel(Level.INFO);
+            logger.addHandler(allMessages);
 
-        FileHandler errorMessages = new FileHandler("error.log", true);
-        errorMessages.setFormatter(new LineLogFormatter());
-        errorMessages.setLevel(Level.SEVERE);
-        logger.addHandler(errorMessages);
+            FileHandler errorMessages = new FileHandler("error.log", true);
+            errorMessages.setFormatter(new LineLogFormatter());
+            errorMessages.setLevel(Level.SEVERE);
+            logger.addHandler(errorMessages);
 
-        ConsoleHandler handler = new ConsoleHandler();
-        handler.setFormatter(new LineLogFormatter());
-        handler.setLevel(Level.ALL);
-        logger.addHandler(handler);
+            ConsoleHandler handler = new ConsoleHandler();
+            handler.setFormatter(new LineLogFormatter());
+            handler.setLevel(Level.ALL);
+            logger.addHandler(handler);
 
-        logger.info("Starting JBot...");
+            logger.info("Starting JBot...");
 
-        JBot bot = new JBot();
+            JBot bot = new JBot();
 
-        List<Option> optionList = new ArrayList<>();
+            List<Option> optionList = new ArrayList<>();
 
-        optionList.add(new Option(
-                'r', "repository", false, ".mvn", value -> bot.repository = new AetherArtifactRepository(
-                        Repositories.getRemoteRepositories(),
-                        new File(value)
-                ), "local maven repository path"));
-
-
-        optionList.add(new Option(
-                'w', "waitOnStop", true, null, value -> bot.registerStateListener(botState -> {
-                    switch (botState) {
-                        case STOPPED:
-                            System.exit(0);
-                            break;
-                    }
-                }), "wait when bot is stopped"));
+            optionList.add(new Option(
+                    'r', "repository", false, ".mvn", value -> bot.repository = new AetherArtifactRepository(
+                    Repositories.getRemoteRepositories(),
+                    new File(value)
+            ), "local maven repository path"));
 
 
-        optionList.add(new Option(
-                'h', "hibernateConfiguration", false, "hibernate.properties", value ->  {
-                    try (LogTimer section_configuring = new LogTimer("Configuring database")) {
-                        Properties properties = new Properties();
-                        properties.load(new FileReader(new File(value)));
-
-                        try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
-                            bot.databaseManager = new HibernateManager(bot, properties);
-
-                            bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
-                                model.registerEntity(Plugin.class);
-                                model.registerEntity(Database.class);
-                                model.registerEntity(Entity.class);
-                                model.registerEntity(Permission.class);
-                                model.registerEntity(Group.class);
-                                model.registerEntity(com.github.manevolent.jbot.database.model.Platform.class);
-                                model.registerEntity(User.class);
-                                model.registerEntity(UserAssociation.class);
-                                model.registerEntity(Conversation.class);
-                                model.registerEntity(UserGroup.class);
-                                model.registerEntity(PluginConfiguration.class);
-                                model.registerEntity(UserBan.class);
-
-                                return model.define();
-                            });
-
-                            bot.userManager = new DefaultUserManager(bot.systemDatabase);
-                            bot.platformManager = new DefaultPlatformManager(bot.systemDatabase);
-                        }
-                    } catch (Exception ex) {
-                        throw new RuntimeException("Problem reading Hibernate configuration", ex);
-                    }
-        }, "Hibernate configuration file"));
-
-        Options options = new Options();
-
-        for (Option option : optionList)
-            options.addOption(Character.toString(option.commandLineLetter), option.name, !option.flag, null);
-
-        options.addOption("p", "properties", true, "java properties file");
-
-        CommandLineParser parser = new DefaultParser();
-        CommandLine cmd = parser.parse(options, args);
-
-        Properties properties = new Properties();
-        File propertiesFile = new File(cmd.getOptionValue("properties"), "jbot.properties");
-        if (propertiesFile.exists())
-            properties.load(new FileInputStream(propertiesFile));
-
-        try (LogTimer timer = new LogTimer("Parsing commandline options")) {
-            for (Option option : optionList) {
-                String value = null;
-
-                if (option.flag) {
-                    if (cmd.hasOption(option.name))
-                        value = "set";
-                    else {
-                        // Not set
-                    }
-                } else {
-                    if (cmd.hasOption(option.name)) {
-                        value = cmd.getOptionValue(option.name, option.defaultValue);
-                    } else if (properties.containsKey(option.name)) {
-                        value = properties.get(option.name).toString();
-                    } else if (System.getProperties().containsKey("jbot." + option.name)) {
-                        value = System.getProperties().get("jbot." + option.name).toString();
-                    } else {
-                        value = option.defaultValue;
-                    }
+            optionList.add(new Option(
+                    'w', "waitOnStop", true, null, value -> bot.registerStateListener(botState -> {
+                switch (botState) {
+                    case STOPPED:
+                        System.exit(0);
+                        break;
                 }
+            }), "wait when bot is stopped"));
 
-                if (value != null) option.valueConsumer.accept(value);
+
+            optionList.add(new Option(
+                    'h', "hibernateConfiguration", false, "hibernate.properties", value -> {
+                try (LogTimer section_configuring = new LogTimer("Configuring database")) {
+                    Properties properties = new Properties();
+                    properties.load(new FileReader(new File(value)));
+
+                    try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
+                        bot.databaseManager = new HibernateManager(bot, properties);
+
+                        bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
+                            model.registerEntity(Plugin.class);
+                            model.registerEntity(Database.class);
+                            model.registerEntity(Entity.class);
+                            model.registerEntity(Permission.class);
+                            model.registerEntity(Group.class);
+                            model.registerEntity(com.github.manevolent.jbot.database.model.Platform.class);
+                            model.registerEntity(User.class);
+                            model.registerEntity(UserAssociation.class);
+                            model.registerEntity(Conversation.class);
+                            model.registerEntity(UserGroup.class);
+                            model.registerEntity(PluginConfiguration.class);
+                            model.registerEntity(UserBan.class);
+
+                            return model.define();
+                        });
+
+                        bot.userManager = new DefaultUserManager(bot.systemDatabase);
+                        bot.platformManager = new DefaultPlatformManager(bot.systemDatabase);
+                    }
+                } catch (Exception ex) {
+                    throw new RuntimeException("Problem reading Hibernate configuration", ex);
+                }
+            }, "Hibernate configuration file"));
+
+            Options options = new Options();
+
+            for (Option option : optionList)
+                options.addOption(Character.toString(option.commandLineLetter), option.name, !option.flag, null);
+
+            options.addOption("p", "properties", true, "java properties file");
+
+            CommandLineParser parser = new DefaultParser();
+            CommandLine cmd = parser.parse(options, args);
+
+            Properties properties = new Properties();
+            File propertiesFile = new File(cmd.getOptionValue("properties"), "jbot.properties");
+            if (propertiesFile.exists())
+                properties.load(new FileInputStream(propertiesFile));
+
+            try (LogTimer timer = new LogTimer("Parsing commandline options")) {
+                for (Option option : optionList) {
+                    String value = null;
+
+                    if (option.flag) {
+                        if (cmd.hasOption(option.name))
+                            value = "set";
+                        else {
+                            // Not set
+                        }
+                    } else {
+                        if (cmd.hasOption(option.name)) {
+                            value = cmd.getOptionValue(option.name, option.defaultValue);
+                        } else if (properties.containsKey(option.name)) {
+                            value = properties.get(option.name).toString();
+                        } else if (System.getProperties().containsKey("jbot." + option.name)) {
+                            value = System.getProperties().get("jbot." + option.name).toString();
+                        } else {
+                            value = option.defaultValue;
+                        }
+                    }
+
+                    if (value != null) option.valueConsumer.accept(value);
+                }
             }
-        }
 
-        // Get root user
-        String rootUsername = "root";
-        com.github.manevolent.jbot.user.User user;
-        try (LogTimer section_login = new LogTimer("Logging in as \"" + rootUsername + "\"")) {
-            user = bot.getUserManager().getUserByName(rootUsername);
+            // Get root user
+            String rootUsername = "root";
+            com.github.manevolent.jbot.user.User user;
+            try (LogTimer section_login = new LogTimer("Logging in as \"" + rootUsername + "\"")) {
+                user = bot.getUserManager().getUserByName(rootUsername);
 
-            if (user == null){
-                logger.info("Creating new root user \"" + rootUsername + "\".");
-                user = bot.getUserManager().createUser(rootUsername, UserType.SYSTEM);
-                logger.info("Created new root user \"" + rootUsername + "\".");
+                if (user == null) {
+                    logger.info("Creating new root user \"" + rootUsername + "\".");
+                    user = bot.getUserManager().createUser(rootUsername, UserType.SYSTEM);
+                    logger.info("Created new root user \"" + rootUsername + "\".");
+                }
             }
+
+            user.setType(UserType.SYSTEM);
+
+            logger.info("Logged in as " + user.getName() + ".");
+
+            Virtual.setInstance(new DefaultVirtual(user));
+
+            bot.pluginManager = new DefaultPluginManager(
+                    bot,
+                    bot.eventManager,
+                    bot.databaseManager,
+                    bot.commandManager,
+                    bot.platformManager
+            );
+
+            bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager));
+            bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager));
+            bot.commandManager.registerExecutor("version", new VersionCommand(bot));
+            bot.commandManager.registerExecutor("platform", new PlatformCommand(bot.platformManager));
+            bot.commandManager.registerExecutor("chat", new ChatCommand(bot.platformManager));
+            bot.commandManager.registerExecutor("user", new UserCommand(bot.platformManager, bot.userManager));
+            bot.commandManager.registerExecutor("group", new GroupCommand(bot.userManager));
+            bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
+
+            Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
+            PlatformRegistration consolePlatformRegistration = platformBuilder
+                    .id("console").name("Console")
+                    .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))
+                    .register(null);
+            // Ensure registered to stdin
+            user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
+            consolePlatformRegistration.getConnection().connect();
+
+            bot.start();
+
+            Logger.getGlobal().info("JBot started successfully.");
+
+            bot.run();
+        } finally {
+            System.exit(0);
         }
-
-        user.setType(UserType.SYSTEM);
-
-        logger.info("Logged in as " + user.getName() + ".");
-
-        Virtual.setInstance(new DefaultVirtual(user));
-
-        bot.pluginManager = new DefaultPluginManager(
-                bot,
-                bot.eventManager,
-                bot.databaseManager,
-                bot.commandManager,
-                bot.platformManager
-        );
-
-        bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager));
-
-        Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
-        PlatformRegistration consolePlatformRegistration = platformBuilder
-                .id("console").name("Console")
-                .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))
-                .register(null);
-        // Ensure registered to stdin
-        user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
-        consolePlatformRegistration.getConnection().connect();
-
-        Logger.getGlobal().info("JBot started successfully.");
-
-        bot.start();
     }
 
     public ArtifactRepository getRepository() {

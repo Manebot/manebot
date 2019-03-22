@@ -8,7 +8,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class DefaultVirtual extends Virtual {
+public final class DefaultVirtual extends Virtual {
     private final Collection<VirtualProcess> processes = new HashSet<>();
     private final Map<Thread, VirtualProcess> threadMap = new LinkedHashMap<>();
     private final VirtualProcess root;

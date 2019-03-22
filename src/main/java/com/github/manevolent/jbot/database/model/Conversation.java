@@ -86,7 +86,7 @@ public class Conversation extends TimedRow implements com.github.manevolent.jbot
                 if (connection == null || !connection.isConnected())
                     throw new IllegalStateException("platform not connected: " + getPlatform().getId());
 
-                chat = connection.getChatById(getId());
+                chat = connection.getChat(getId());
             }
         }
 

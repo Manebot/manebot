@@ -87,7 +87,7 @@ public class DefaultConversationProvider implements ConversationProvider {
         if (connection == null || !connection.isConnected())
             throw new IllegalStateException("Platform is not connected");
 
-        Chat chat = connection.getChatById(chatId);
+        Chat chat = connection.getChat(chatId);
         if (chat == null)
             throw new IllegalArgumentException("Chat not found");
 

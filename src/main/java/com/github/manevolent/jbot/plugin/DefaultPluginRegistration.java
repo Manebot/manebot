@@ -5,7 +5,7 @@ import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
 
 import java.util.concurrent.Callable;
 
-public class DefaultPluginRegistration implements PluginRegistration {
+public final class DefaultPluginRegistration implements PluginRegistration {
     private final Bot bot;
     private final PluginManager pluginManager;
     private final Callable<Plugin> loader;

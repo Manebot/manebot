@@ -9,6 +9,7 @@ import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.command.CommandExecutionEvent;
 import com.github.manevolent.jbot.user.User;
 
+import java.util.Calendar;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -92,6 +93,8 @@ abstract class CommandShell {
             commandMessage.getSender().sendMessage("Problem executing command: " + e.getMessage());
         } finally {
             commandMessage.getSender().end();
+
+            getUser().setLastSeenDate(Calendar.getInstance().getTime());
         }
     }
 }

@@ -1,8 +1,11 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.user.UserGroupMembership;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
+import java.sql.SQLException;
+import java.util.Date;
 
 @javax.persistence.Entity
 @Table(
@@ -14,7 +17,7 @@ import javax.persistence.*;
         uniqueConstraints = {@UniqueConstraint(columnNames ={"userId", "groupId"})}
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class UserGroup {
+public class UserGroup extends TimedRow implements UserGroupMembership {
     @Transient
     private final com.github.manevolent.jbot.database.Database database;
     public UserGroup(com.github.manevolent.jbot.database.Database database) {
@@ -54,48 +57,38 @@ public class UserGroup {
     @Column(nullable = true)
     private Integer updated;
 
-    public int getCreated() {
-        return created;
-    }
-
-    public void setCreated(int created) {
-        this.created = created;
-    }
-
-    public int getUpdated() {
-        return updated;
-    }
-
-    public void setUpdated(int updated) {
-        this.updated = updated;
-    }
-
-    public int getXrefId() {
+    public int getUserGroupId() {
         return xrefId;
     }
 
+    @Override
     public User getUser() {
         return user;
     }
 
-    public void setUser(User user) {
-        this.user = user;
-    }
-
+    @Override
     public Group getGroup() {
         return group;
-    }
-
-    public void setGroup(Group group) {
-        this.group = group;
     }
 
     public User getAddingUser() {
         return addingUser;
     }
 
-    public void setAddingUser(User addingUser) {
-        this.addingUser = addingUser;
+    @Override
+    public Date getAddedDate() {
+        return getCreatedDate();
+    }
+
+    @Override
+    public void remove() throws SecurityException {
+        try {
+            database.executeTransaction(s -> {
+                s.remove(UserGroup.this);
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

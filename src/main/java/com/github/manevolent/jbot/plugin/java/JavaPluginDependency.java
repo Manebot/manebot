@@ -2,7 +2,7 @@ package com.github.manevolent.jbot.plugin.java;
 
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 
-public class JavaPluginDependency {
+public final class JavaPluginDependency {
     private final JavaPluginInstance instance;
     private final ArtifactVersion minimumVersion;
 

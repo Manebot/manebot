@@ -22,12 +22,10 @@ public final class DefaultPluginManager implements PluginManager {
             com.github.manevolent.jbot.database.model.Plugin.class;
 
     private final PluginLoaderRegistry pluginLoaderRegistry;
-
-    private final EventManager eventManager;
     private final JBot bot;
 
     private final Set<Plugin> plugins = new HashSet<>();
-    private final Map<String, Plugin> pluginMap = new LinkedHashMap<>();
+    private final Map<ManifestIdentifier, PluginRegistration> pluginMap = new LinkedHashMap<>();
 
     private final Object installLock = new Object();
 
@@ -38,7 +36,6 @@ public final class DefaultPluginManager implements PluginManager {
                                 PlatformManager platformManager
     ) {
         this.bot = bot;
-        this.eventManager = eventManager;
         this.pluginLoaderRegistry = new PluginLoaderRegistry();
         this.pluginLoaderRegistry.registerLoader("jar",
                 new JavaPluginLoader(
@@ -62,16 +59,24 @@ public final class DefaultPluginManager implements PluginManager {
         return pluginLoaderRegistry;
     }
 
+    @Override
+    public PluginRegistration getPlugin(ManifestIdentifier id) {
+        return pluginMap.get(id);
+    }
+
     private PluginRegistration getOrLoadRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
         PluginRegistration registration = plugin.getRegistration();
 
-        if (registration == null)
+        if (registration == null) {
             plugin.setRegistration(registration = new DefaultPluginRegistration(
                     bot,
                     this,
                     plugin.getArtifactIdentifier(),
                     () -> load(plugin.getArtifactIdentifier())
             ));
+
+            pluginMap.put(plugin.getArtifactIdentifier().withoutVersion(), registration);
+        }
 
         return registration;
     }
@@ -83,13 +88,13 @@ public final class DefaultPluginManager implements PluginManager {
 
     private Plugin load(LocalArtifact localArtifact)
             throws PluginLoadException, FileNotFoundException {
-        // PluginManager in the API has a decent implementation of this functionality, let's depend on that here.
-        Plugin plugin = getLoaderRegistry()
-                .getLoader(localArtifact.getFile())
-                .load(localArtifact);
+        PluginRegistration registration = getPlugin(localArtifact.getIdentifier().withoutVersion());
+        if (registration != null && registration.isLoaded())
+            throw new IllegalStateException(localArtifact.getIdentifier().withoutVersion() + " is already loaded.");
+
+        Plugin plugin = getLoaderRegistry().getLoader(localArtifact.getFile()).load(localArtifact);
 
         plugins.add(plugin);
-        pluginMap.put(plugin.getName(), plugin);
 
         try {
             bot.getEventDispatcher().execute(new PluginRegisteredEvent(this, plugin));
@@ -190,15 +195,31 @@ public final class DefaultPluginManager implements PluginManager {
     }
 
     @Override
-    public ArtifactIdentifier resolveIdentifier(String s) {
+    public ArtifactIdentifier resolveIdentifier(String identifier) {
         try {
-            return ArtifactIdentifier.fromString(s);
+            return ArtifactIdentifier.fromString(identifier);
         } catch (IllegalArgumentException ex) {
-            ManifestIdentifier manifestIdentifier = ManifestIdentifier.fromString(s);
             try {
+                ArtifactIdentifier existingIdentifier =
+                        getLoadedPlugins()
+                                .stream()
+                                .filter(p ->
+                                        p.getArtifact().getIdentifier().getArtifactId()
+                                        .equalsIgnoreCase(identifier)
+                                ).map(x -> x.getArtifact().getIdentifier())
+                                .findFirst()
+                                .orElse(null);
+
+                if (existingIdentifier != null) return existingIdentifier;
+            } catch (Exception ex2) {
+                // Do nothing
+            }
+
+            try {
+                ManifestIdentifier manifestIdentifier = ManifestIdentifier.fromString(identifier);
                 return getRepostiory().getManifest(manifestIdentifier).getLatestVersion();
-            } catch (ArtifactRepositoryException e) {
-                throw new IllegalArgumentException("Problem resolving identifier", e);
+            } catch (ArtifactRepositoryException ex3) {
+                throw new IllegalArgumentException("Problem resolving identifier", ex3);
             }
         }
     }

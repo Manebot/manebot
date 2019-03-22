@@ -5,12 +5,13 @@ import com.github.manevolent.jbot.database.model.Entity;
 import com.github.manevolent.jbot.database.model.EntityType;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.user.*;
+import com.github.manevolent.jbot.virtual.Virtual;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 
-public class DefaultUserManager implements UserManager {
+public final class DefaultUserManager implements UserManager {
     private static final Class<com.github.manevolent.jbot.database.model.User> userClass
             = com.github.manevolent.jbot.database.model.User.class;
 
@@ -51,7 +52,8 @@ public class DefaultUserManager implements UserManager {
     @Override
     public User getUserByName(String username) {
         return systemDatabase.execute(s -> { return s
-                .createQuery("from " + User.class.getName() + " u where u.username = :username", User.class)
+                .createQuery("from " + User.class.getName() + " u " +
+                        "where u.username = :username", User.class)
                 .setParameter("username", username)
                 .getResultList()
                 .stream().findFirst().orElse(null);
@@ -61,7 +63,8 @@ public class DefaultUserManager implements UserManager {
     @Override
     public User getUserByDisplayName(String displayName) {
         return systemDatabase.execute(s -> { return s
-                .createQuery("from " + userClass.getName() + " u where u.displayName = :displayName", userClass)
+                .createQuery("from " + userClass.getName() + " u " +
+                        "where u.displayName = :displayName or u.username = :displayName", userClass)
                 .setParameter("displayName", displayName)
                 .getResultList()
                 .stream().findFirst().orElse(null);
@@ -109,8 +112,31 @@ public class DefaultUserManager implements UserManager {
     }
 
     @Override
-    public UserGroup createUserGroup(String s) {
-        return null;
+    public UserGroup createUserGroup(String name) {
+        if (getUserGroupByName(name) != null)
+            throw new IllegalArgumentException("name", new SQLException("group name already exists"));
+
+        Entity entity = new Entity(systemDatabase, EntityType.USER);
+
+        com.github.manevolent.jbot.database.model.Group group =
+                new com.github.manevolent.jbot.database.model.Group(
+                        systemDatabase,
+                        entity,
+                        name,
+                        (com.github.manevolent.jbot.database.model.User)
+                                Virtual.getInstance().currentProcess().getUser()
+                );
+
+        try {
+            systemDatabase.executeTransaction(entityManager -> {
+                entityManager.persist(entity);
+                entityManager.persist(group);
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return group;
     }
 
     @Override

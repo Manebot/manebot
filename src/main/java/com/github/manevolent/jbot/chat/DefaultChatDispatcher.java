@@ -52,7 +52,11 @@ public class DefaultChatDispatcher implements ChatDispatcher {
             }
 
             Conversation conversation = bot.getConversationProvider().getConversationByChat(chat);
-            CommandSender commandSender = userAssociation.getUser().createSender(conversation);
+            CommandSender commandSender = userAssociation.getUser().createSender(
+                    conversation,
+                    chatMessage.getSender().getPlatformUser()
+            );
+
             return bot.getCommandDispatcher().executeAsync(new CommandMessage(commandMessage, commandSender));
         } else
             return bot.getEventDispatcher().executeAsync(new ChatMessageReceivedEvent(this, chatMessage));

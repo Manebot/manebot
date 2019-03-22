@@ -6,6 +6,7 @@ import com.github.manevolent.jbot.chat.exception.ChatException;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformConnection;
+import com.github.manevolent.jbot.platform.PlatformUser;
 import com.github.manevolent.jbot.virtual.Virtual;
 import com.github.manevolent.jbot.virtual.VirtualProcess;
 import org.jline.reader.*;
@@ -22,16 +23,19 @@ import java.util.logging.Logger;
 
 public class ConsolePlatformConnection implements PlatformConnection {
     public static final String CONSOLE_UID = "stdin";
+    public static final String CONSOLE_CHAT_ID = "std";
 
     private final JBot bot;
     private final Platform platform;
     private final Chat consoleChat;
+    private final PlatformUser consoleUser;
 
     private Terminal terminal;
 
     public ConsolePlatformConnection(JBot bot, Platform platform) {
         this.bot = bot;
         this.platform = platform;
+        this.consoleUser = new ConsoleUser();
         this.consoleChat = new ConsoleChat();
     }
 
@@ -49,7 +53,7 @@ public class ConsolePlatformConnection implements PlatformConnection {
                 .build();
 
         VirtualProcess process = Virtual.getInstance().create(() -> {
-            ChatSender sender = new DefaultChatSender(CONSOLE_UID, consoleChat);
+            ChatSender sender = consoleUser.createSender(consoleChat);
 
             while (true) {
                 String line;
@@ -108,8 +112,55 @@ public class ConsolePlatformConnection implements PlatformConnection {
     }
 
     @Override
+    public PlatformUser getSelf() {
+        return null;
+    }
+
+    @Override
+    public PlatformUser getPlatformUser(String s) {
+        return null;
+    }
+
+    @Override
+    public Collection<PlatformUser> getPlatformUsers() {
+        return null;
+    }
+
+    @Override
+    public Collection<String> getPlatformUserIds() {
+        return null;
+    }
+
+    @Override
     public Collection<Chat> getChats() {
         return Collections.singletonList(consoleChat);
+    }
+
+    @Override
+    public Collection<String> getChatIds() {
+        return Collections.singletonList(CONSOLE_CHAT_ID);
+    }
+
+    private class ConsoleUser implements PlatformUser {
+        @Override
+        public Platform getPlatform() {
+            return platform;
+        }
+
+        @Override
+        public String getId() {
+            return CONSOLE_UID;
+        }
+
+        @Override
+        public boolean isSelf() {
+            return true;
+        }
+
+        @Override
+        public Collection<Chat> getChats() {
+            return Collections.singletonList(consoleChat);
+        }
     }
 
     private class ConsoleChat implements Chat {
@@ -120,7 +171,7 @@ public class ConsolePlatformConnection implements PlatformConnection {
 
         @Override
         public String getId() {
-            return "std";
+            return CONSOLE_CHAT_ID;
         }
 
         @Override
@@ -144,8 +195,8 @@ public class ConsolePlatformConnection implements PlatformConnection {
         }
 
         @Override
-        public Collection<String> getPlatformMemberIds() {
-            return Collections.singletonList("stdin");
+        public Collection<PlatformUser> getPlatformUsers() {
+            return Collections.singletonList(consoleUser);
         }
 
         @Override

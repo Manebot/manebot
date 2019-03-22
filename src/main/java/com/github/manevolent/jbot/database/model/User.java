@@ -5,6 +5,7 @@ import com.github.manevolent.jbot.security.Grant;
 import com.github.manevolent.jbot.security.GrantedPermission;
 import com.github.manevolent.jbot.security.Permission;
 import com.github.manevolent.jbot.user.UserGroup;
+import com.github.manevolent.jbot.user.UserGroupMembership;
 import com.github.manevolent.jbot.user.UserType;
 import org.hibernate.ReplicationMode;
 import org.hibernate.Session;
@@ -26,8 +27,7 @@ import java.util.stream.Collectors;
         uniqueConstraints = {@UniqueConstraint(columnNames ={"username"})}
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class User extends TimedRow implements
-        com.github.manevolent.jbot.user.User {
+public class User extends TimedRow implements com.github.manevolent.jbot.user.User {
     @Transient
     private final com.github.manevolent.jbot.database.Database database;
     public User(com.github.manevolent.jbot.database.Database database) {
@@ -71,9 +71,6 @@ public class User extends TimedRow implements
     @JoinColumn(name = "privateConversationId")
     private Conversation conversation;
 
-    @OneToMany(mappedBy = "user")
-    private Set<UserAssociation> userAssociations;
-
     public String getDisplayName() {
         return displayName == null ? username : displayName;
     }
@@ -85,12 +82,24 @@ public class User extends TimedRow implements
 
     @Override
     public Date getLastSeenDate() {
-        return getLastSeenDate();
+        return lastSeen == null ? null : new Date((long) lastSeen * 1000L);
     }
 
     @Override
-    public Collection<UserGroup> getGroups() {
-        return null;
+    public void setLastSeenDate(Date date) {
+        setLastSeen((int) (date.getTime() / 1000));
+    }
+
+    @Override
+    public Collection<UserGroupMembership> getMembership() {
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserGroup.class.getName() + " x " +
+                            "inner join x.user u " +
+                            "where u.userId = :userId",
+                    com.github.manevolent.jbot.database.model.UserGroup.class
+            ).setParameter("userId", getUserId()).getResultList();
+        }));
     }
 
     public void setDisplayName(String displayName) {
@@ -104,10 +113,6 @@ public class User extends TimedRow implements
 
     public int getUserId() {
         return userId;
-    }
-
-    public Integer getLastSeen() {
-        return lastSeen;
     }
 
     public void setLastSeen(int lastSeen) {
@@ -146,10 +151,14 @@ public class User extends TimedRow implements
     }
 
     public Collection<com.github.manevolent.jbot.user.UserAssociation> getAssociations() {
-        return Collections.unmodifiableCollection(userAssociations.stream().map(
-                assoc ->
-                (com.github.manevolent.jbot.user.UserAssociation) assoc
-        ).collect(Collectors.toList()));
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserAssociation.class.getName() + " x " +
+                            "inner join x.user u " +
+                            "where u.userId = :userId",
+                    com.github.manevolent.jbot.database.model.UserAssociation.class
+            ).setParameter("userId", getUserId()).getResultList();
+        }));
     }
 
     @Override

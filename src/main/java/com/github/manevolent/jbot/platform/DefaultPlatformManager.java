@@ -22,8 +22,8 @@ public class DefaultPlatformManager implements PlatformManager {
     }
 
     @Override
-    public Platform.Builder buildPlatform() {
-        return new Platform.Builder() {
+    public Platform.Builder buildPlatform(Plugin plugin) {
+        return new Platform.Builder(plugin) {
             private com.github.manevolent.jbot.database.model.Platform platform;
 
             public Platform.Builder id(String id) {
@@ -67,6 +67,11 @@ public class DefaultPlatformManager implements PlatformManager {
                 }
             }
         };
+    }
+
+    @Override
+    public Platform.Builder buildPlatform() {
+        return buildPlatform(null);
     }
 
     @Override

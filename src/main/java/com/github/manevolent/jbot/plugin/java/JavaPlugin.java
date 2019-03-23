@@ -150,7 +150,7 @@ public final class JavaPlugin implements Plugin, EventListener {
     private void onEnable() throws PluginException {
         // Register platforms
         for (Function<Platform.Builder, PlatformRegistration> function : platformBuilders) {
-            Platform.Builder builder = platformManager.buildPlatform();
+            Platform.Builder builder = platformManager.buildPlatform(this);
             platforms.add(function.apply(builder));
         }
 

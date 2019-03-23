@@ -113,22 +113,23 @@ public class ConsolePlatformConnection implements PlatformConnection {
 
     @Override
     public PlatformUser getSelf() {
-        return null;
+        return consoleUser;
     }
 
     @Override
     public PlatformUser getPlatformUser(String s) {
-        return null;
+        if (s.equals(CONSOLE_UID)) return consoleUser;
+        else return null;
     }
 
     @Override
     public Collection<PlatformUser> getPlatformUsers() {
-        return null;
+        return Collections.singleton(consoleUser);
     }
 
     @Override
     public Collection<String> getPlatformUserIds() {
-        return null;
+        return Collections.singleton(CONSOLE_UID);
     }
 
     @Override

@@ -1,8 +1,10 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.plugin.PluginRegistration;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
+import java.sql.SQLException;
 
 @javax.persistence.Entity
 @Table(
@@ -12,11 +14,18 @@ import javax.persistence.*;
         uniqueConstraints = {@UniqueConstraint(columnNames ={"pluginId","name"})}
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class PluginConfiguration extends TimedRow {
+public class PluginProperty extends TimedRow implements com.github.manevolent.jbot.plugin.PluginProperty {
     @Transient
     private final com.github.manevolent.jbot.database.Database database;
-    public PluginConfiguration(com.github.manevolent.jbot.database.Database database) {
+    public PluginProperty(com.github.manevolent.jbot.database.Database database) {
         this.database = database;
+    }
+    public PluginProperty(com.github.manevolent.jbot.database.Database database, Plugin plugin, String name, String value) {
+        this(database);
+
+        this.plugin = plugin;
+        this.name = name;
+        this.value = value;
     }
 
     @Id
@@ -38,20 +47,12 @@ public class PluginConfiguration extends TimedRow {
         return pluginConfigurationId;
     }
 
-    public Plugin getPlugin() {
-        return plugin;
-    }
-
-    public void setPlugin(Plugin plugin) {
-        this.plugin = plugin;
+    public PluginRegistration getPluginRegistration() {
+        return plugin.getRegistration();
     }
 
     public String getName() {
         return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public String getValue() {
@@ -59,11 +60,28 @@ public class PluginConfiguration extends TimedRow {
     }
 
     public void setValue(String value) {
-        this.value = value;
+        try {
+            this.value = database.executeTransaction(s -> {
+                PluginProperty property = s.find(PluginProperty.class, getPluginConfigurationId());
+                return property.value = value;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public int hashCode() {
         return Integer.hashCode(pluginConfigurationId);
+    }
+
+    public void remove() {
+        try {
+            database.executeTransaction(s -> {
+                s.remove(PluginProperty.this);
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

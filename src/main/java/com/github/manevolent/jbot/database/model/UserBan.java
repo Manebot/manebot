@@ -1,21 +1,25 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.security.Permission;
+import com.github.manevolent.jbot.virtual.Virtual;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
+import java.sql.SQLException;
+import java.util.Date;
 
 @javax.persistence.Entity
 @Table(
         indexes = {
                 @Index(columnList = "userId"),
                 @Index(columnList = "banningUserId"),
-                @Index(columnList = "end"),
+                @Index(columnList = "end,pardoned"),
                 @Index(columnList = "created"),
                 @Index(columnList = "updated")
         }
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-public class UserBan extends TimedRow {
+public class UserBan extends TimedRow implements com.github.manevolent.jbot.user.UserBan {
     @Transient
     private final com.github.manevolent.jbot.database.Database database;
     public UserBan(com.github.manevolent.jbot.database.Database database) {
@@ -57,6 +61,9 @@ public class UserBan extends TimedRow {
     @Column(nullable = false)
     private int created;
 
+    @Column(nullable = false)
+    private boolean pardoned;
+
     @Column(nullable = true)
     private Integer updated;
 
@@ -72,12 +79,40 @@ public class UserBan extends TimedRow {
         return reason;
     }
 
-    public int getEnd() {
-        return end;
-    }
-
     public User getBanningUser() {
         return banningUser;
+    }
+
+    @Override
+    public Date getDate() {
+        return getCreatedDate();
+    }
+
+    @Override
+    public Date getEnd() {
+        return new Date(end * 1000);
+    }
+
+    @Override
+    public boolean isPardoned() {
+        return pardoned;
+    }
+
+    @Override
+    public void pardon() throws SecurityException {
+        if (Virtual.getInstance().currentProcess().getUser() == user)
+            throw new SecurityException("Cannot pardon own user");
+
+        Permission.checkPermission("system.ban.pardon");
+
+        try {
+            pardoned = database.executeTransaction(s -> {
+                UserBan userBan = s.find(UserBan.class, getUserBanId());
+                return userBan.pardoned = true;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

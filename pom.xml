@@ -75,7 +75,7 @@
         <dependency>
             <groupId>com.github.manevolent</groupId>
             <artifactId>jbot-core</artifactId>
-            <version>1afa81aeadd1a745722b7f382cbfd0f9cd5e09ed</version>
+            <version>5329b26711d8ecaaf99bb5e4058fcd55aeca3ab1</version>
         </dependency>
 
         <dependency>

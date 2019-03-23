@@ -70,7 +70,7 @@ public final class DefaultPluginManager implements PluginManager {
         if (registration == null) {
             plugin.setRegistration(registration = new DefaultPluginRegistration(
                     bot,
-                    this,
+                    plugin, this,
                     plugin.getArtifactIdentifier(),
                     () -> load(plugin.getArtifactIdentifier())
             ));
@@ -147,7 +147,7 @@ public final class DefaultPluginManager implements PluginManager {
                 final PluginRegistration registration =
                         new DefaultPluginRegistration(
                                 bot,
-                                this,
+                                plugin, this,
                                 artifactIdentifier,
                                 () -> load(artifactIdentifier)
                         );

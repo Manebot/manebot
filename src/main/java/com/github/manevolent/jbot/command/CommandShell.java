@@ -1,6 +1,7 @@
 package com.github.manevolent.jbot.command;
 
 import com.github.manevolent.jbot.command.exception.CommandAccessException;
+import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
 import com.github.manevolent.jbot.command.exception.CommandNotFoundException;
 import com.github.manevolent.jbot.command.executor.CommandExecutor;
@@ -9,11 +10,18 @@ import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.command.CommandExecutionEvent;
 import com.github.manevolent.jbot.user.User;
 
-import java.util.Calendar;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 abstract class CommandShell {
+    private static final Map<Class<? extends Throwable>, Class<? extends CommandExecutionException>>
+            permittedExceptionClasses = new LinkedHashMap<>();
+    {
+        permittedExceptionClasses.put(IllegalArgumentException.class, CommandArgumentException.class);
+        permittedExceptionClasses.put(SecurityException.class, CommandAccessException.class);
+    }
+
     private final CommandManager commandManager;
     private final EventDispatcher eventDispatcher;
 
@@ -38,24 +46,29 @@ abstract class CommandShell {
 
         label = label.toLowerCase();
 
-        // Find command associated with this label
-        CommandExecutor executor = commandManager.getExecutor(label);
-        if (executor == null) throw new CommandNotFoundException(label);
 
         try {
-            eventDispatcher.execute(
-                    new CommandExecutionEvent(this, executor, commandMessage.getSender(), commandMessage)
-            );
-        } catch (EventExecutionException e) {
-            throw new CommandExecutionException(e);
-        }
+            // Find command associated with this label
+            CommandExecutor executor = commandManager.getExecutor(label);
+            if (executor == null) throw new CommandNotFoundException(label);
 
-        try {
+            try {
+                eventDispatcher.execute(
+                        new CommandExecutionEvent(this, executor, commandMessage.getSender(), commandMessage)
+                );
+            } catch (EventExecutionException e) {
+                throw new CommandExecutionException(e);
+            }
+
             if (executor.isBuffered() && commandMessage.getSender().getChat().isBuffered())
                 commandMessage.getSender().begin();
 
             try {
-                executor.execute(commandMessage.getSender(), label, arguments);
+                try {
+                    executor.execute(commandMessage.getSender(), label, arguments);
+                } catch (IllegalArgumentException e) {
+                    throw new CommandArgumentException(e.getMessage());
+                }
             } catch (ThreadDeath threadDeath) {
                 throw new CommandAccessException("Command execution was forcefully stopped.", threadDeath);
             } catch (SecurityException e) { // Un-wrap security exceptions.
@@ -76,6 +89,22 @@ abstract class CommandShell {
                     if (e.getCause() != null) e = e.getCause();
                     else throw (CommandExecutionException) e;
                 }
+
+                // If the exception is "permitted" (whitelisted), allow it to propagate to the end-user.
+                Class<? extends CommandExecutionException> permittedExceptionClass =
+                        permittedExceptionClasses.get(e.getClass());
+                CommandExecutionException permittedException = null;
+                if (permittedExceptionClass != null) {
+                    try {
+                        permittedException =
+                                permittedExceptionClass
+                                .getConstructor(String.class, Throwable.class) // message, cause (to propagate stacktrace)
+                                .newInstance(e.getMessage(), e);
+                    } catch (ReflectiveOperationException ex) {
+                        throw new RuntimeException(ex); // Should not happen
+                    }
+                }
+                if (permittedException != null) throw permittedException;
 
                 // The exception isn't a part of the typical CommandExecutionException chain, and we must
                 // mute the details. Could be a bug or command error deeper in the system we don't want to

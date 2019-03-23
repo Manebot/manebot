@@ -96,6 +96,18 @@ public class Permission extends TimedRow implements GrantedPermission {
     }
 
     @Override
+    public void remove() throws SecurityException {
+        try {
+            database.executeTransaction(s -> {
+                Permission permission = s.find(Permission.class, getPermissionId());
+                s.remove(permission);
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public int hashCode() {
         return Integer.hashCode(permissionId);
     }

@@ -9,6 +9,10 @@ import com.github.manevolent.jbot.platform.PlatformConnection;
 import com.github.manevolent.jbot.platform.PlatformRegistration;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 public class DefaultConversationProvider implements ConversationProvider {
     private static final Class<com.github.manevolent.jbot.database.model.Conversation> conversationClass =
@@ -111,5 +115,20 @@ public class DefaultConversationProvider implements ConversationProvider {
             return getConversation((Platform) platform, chat);
         else
             throw new ClassCastException("platform");
+    }
+
+    @Override
+    public Collection<String> getConversationIds() {
+        return getConversations().stream().map(Conversation::getId).collect(Collectors.toList());
+    }
+
+    @Override
+    public Collection<Conversation> getConversations() {
+        return Collections.unmodifiableCollection(bot.getSystemDatabase().execute(s -> {
+            return new ArrayList<>(s.createQuery(
+                    "select c from " + conversationClass.getName() + " c",
+                    conversationClass
+            ).getResultList());
+        }));
     }
 }

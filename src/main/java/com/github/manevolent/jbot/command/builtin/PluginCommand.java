@@ -1,6 +1,7 @@
 package com.github.manevolent.jbot.command.builtin;
 
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
+import com.github.manevolent.jbot.chat.ChatSender;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
@@ -9,11 +10,13 @@ import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgum
 
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
+
 import com.github.manevolent.jbot.command.response.CommandListResponse;
 import com.github.manevolent.jbot.database.Database;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.plugin.*;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
@@ -65,7 +68,10 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             throw new CommandExecutionException("Failed to install " + artifactIdentifier.toString(), e);
         }
 
-        sender.sendMessage("Installed plugin " + registration.getIdentifier().toString() + ".");
+        sender.sendMessage(
+                "Installed plugin " + registration.getIdentifier().toString() + "; " +
+                "enable it to begin using it."
+        );
     }
 
     @Command(description = "Uninstalls a plugin", permission = "system.plugin.uninstall")
@@ -92,15 +98,157 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             }
         }
 
+        registration.setAutoStart(false);
+
         pluginManager.uninstall(registration);
 
         sender.sendMessage("Uninstalled plugin " + registration.getIdentifier().toString() + ".");
     }
 
+    @Command(description = "Sets a plugin's property", permission = "system.plugin.property.change")
+    public void setProperty(CommandSender sender,
+                            @CommandArgumentLabel.Argument(label = "property") String property,
+                            @CommandArgumentLabel.Argument(label = "set") String set,
+                            @CommandArgumentString.Argument(label = "artifact") String artifact,
+                            @CommandArgumentString.Argument(label = "name") String name,
+                            @CommandArgumentString.Argument(label = "value") String value)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(artifact);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        registration.setProperty(name, value);
+
+        sender.sendMessage("Property changed for " +
+                registration.getIdentifier().toString() + ": " + name + " -> \"" + value + "\".");
+    }
+
+    @Command(description = "Unsets a plugin's property", permission = "system.plugin.property.unset")
+    public void unsetProperty(CommandSender sender,
+                            @CommandArgumentLabel.Argument(label = "property") String property,
+                            @CommandArgumentLabel.Argument(label = "unset") String set,
+                            @CommandArgumentString.Argument(label = "artifact") String artifact,
+                            @CommandArgumentString.Argument(label = "name") String name)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(artifact);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (registration.getProperty(name) == null)
+            throw new CommandArgumentException("Plugin property is not set.");
+
+        registration.setProperty(name, null);
+        sender.sendMessage("Property unset for " + registration.getIdentifier().toString() + ": " + name);
+    }
+
+    @Command(description = "Gets a plugin's property", permission = "system.plugin.property.get")
+    public void getProperty(CommandSender sender,
+                            @CommandArgumentLabel.Argument(label = "property") String property,
+                            @CommandArgumentLabel.Argument(label = "get") String get,
+                            @CommandArgumentString.Argument(label = "artifact") String artifact,
+                            @CommandArgumentString.Argument(label = "name") String name)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(artifact);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        String value = registration.getProperty(name);
+        if (value == null)
+            sender.sendMessage(name + " -> (null).");
+        else
+            sender.sendMessage(name + " -> \"" + value + "\".");
+    }
+
+    @Command(description = "Gets a plugin's property", permission = "system.plugin.property.get")
+    public void listProperty(CommandSender sender,
+                            @CommandArgumentLabel.Argument(label = "property") String property,
+                            @CommandArgumentLabel.Argument(label = "list") String list,
+                            @CommandArgumentString.Argument(label = "artifact") String artifact,
+                            @CommandArgumentPage.Argument() int page)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(artifact);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        sender.list(
+                PluginProperty.class,
+                builder -> builder.direct(new ArrayList<>(registration.getProperties())).page(page)
+                .responder((chatSender, pluginProperty) -> pluginProperty.getName()).build()
+        ).send();
+    }
+
+    @Command(description = "Gets current plugin information", permission = "system.plugin.info")
+    public void info(CommandSender sender) throws CommandExecutionException {
+        info(sender, sender.getChat().getPlatform().getPlugin().getRegistration());
+    }
+
+    @Command(description = "Gets plugin information", permission = "system.plugin.info")
+    public void info(CommandSender sender,
+                       @CommandArgumentLabel.Argument(label = "info") String info,
+                       @CommandArgumentString.Argument(label = "identifier") String identifier)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        info(sender, registration);
+    }
+
+    private void info(CommandSender sender, PluginRegistration registration) throws CommandExecutionException {
+        sender.details(builder -> {
+            builder.name("Plugin").key(registration.getIdentifier().withoutVersion().toString())
+                    .item("Version", registration.getIdentifier().getVersion());
+
+            if (registration.isLoaded()) {
+                builder.item("Loaded", "true");
+
+                builder.item("Dependencies", registration.getInstance().getDependencies()
+                        .stream().map(Plugin::getName).collect(Collectors.toList()));
+
+                builder.item("Databases", registration.getInstance().getDatabases()
+                        .stream().map(Database::getName).collect(Collectors.toList()));
+
+                if (registration.getInstance().isEnabled()) {
+                    builder.item("Enabled", "true");
+
+                    builder.item("Platforms", registration.getInstance().getPlatforms()
+                            .stream().map(Platform::getId).collect(Collectors.toList()));
+
+                    builder.item("Commands", registration.getInstance().getCommands());
+                } else {
+                    builder.item("Enabled", "false");
+                }
+            } else
+                builder.item("Loaded", "false");
+
+            return builder.build();
+        }).send();
+    }
+
     @Command(description = "Enables a plugin", permission = "system.plugin.enable")
     public void enable(CommandSender sender,
-                        @CommandArgumentLabel.Argument(label = "enable") String enable,
-                        @CommandArgumentString.Argument(label = "identifier") String identifier)
+                       @CommandArgumentLabel.Argument(label = "enable") String enable,
+                       @CommandArgumentString.Argument(label = "identifier") String identifier)
             throws CommandExecutionException {
         ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
         if (artifactIdentifier == null)
@@ -122,50 +270,10 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             throw new CommandExecutionException("Failed to enable " + artifactIdentifier.toString(), e);
         }
 
+        // Enable statically
+        registration.setAutoStart(true);
+
         sender.sendMessage("Enabled plugin " + registration.getIdentifier().toString() + ".");
-    }
-
-    @Command(description = "Gets plugin information", permission = "system.plugin.info")
-    public void info(CommandSender sender,
-                       @CommandArgumentLabel.Argument(label = "info") String info,
-                       @CommandArgumentString.Argument(label = "identifier") String identifier)
-            throws CommandExecutionException {
-        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
-        if (artifactIdentifier == null)
-            throw new CommandArgumentException("Plugin not found, or no versions are available.");
-
-        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
-        if (registration == null)
-            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
-
-        sender.details(builder -> {
-            builder.name("Plugin").key(registration.getIdentifier().withoutVersion().toString())
-                    .item("Version", registration.getIdentifier().getVersion());
-
-            if (registration.isLoaded()) {
-                builder.item("Loaded", "true");
-
-                builder.item("Dependencies", registration.getInstance().getDependencies()
-                                .stream().map(Plugin::getName).collect(Collectors.toList()));
-
-                builder.item("Databases", registration.getInstance().getDatabases()
-                        .stream().map(Database::getName).collect(Collectors.toList()));
-
-                if (registration.getInstance().isEnabled()) {
-                    builder.item("Enabled", "true");
-
-                    builder.item("Platforms", registration.getInstance().getPlatforms()
-                            .stream().map(Platform::getId).collect(Collectors.toList()));
-
-                    builder.item("Commands", registration.getInstance().getCommands());
-                } else {
-                    builder.item("Enabled", "false");
-                }
-            } else
-                builder.item("Loaded", "false");
-
-            return builder.build();
-        }).send();
     }
 
     @Command(description = "Disables a plugin", permission = "system.plugin.disable")
@@ -190,6 +298,9 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         } catch (PluginException e) {
             throw new CommandExecutionException("Failed to disable " + artifactIdentifier.toString(), e);
         }
+
+        // Disable statically
+        registration.setAutoStart(false);
 
         sender.sendMessage("Disabled plugin " + registration.getIdentifier().toString() + ".");
     }

@@ -95,6 +95,7 @@ public class Group extends TimedRow implements UserGroup {
                             "where u.userId = :userId and g.groupId = :groupId",
                     com.github.manevolent.jbot.database.model.UserGroup.class
             )
+                    .setMaxResults(1)
                     .setParameter("userId", ((User)user).getUserId())
                     .setParameter("groupId", this.getGroupId())
                     .getResultList()

@@ -1,12 +1,16 @@
 package com.github.manevolent.jbot.database.model;
 
+import com.github.manevolent.jbot.cache.CachedValue;
+import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.security.Grant;
 import com.github.manevolent.jbot.security.GrantedPermission;
 import com.github.manevolent.jbot.security.Permission;
+import com.github.manevolent.jbot.user.UserBan;
 import com.github.manevolent.jbot.user.UserGroup;
 import com.github.manevolent.jbot.user.UserGroupMembership;
 import com.github.manevolent.jbot.user.UserType;
+import com.github.manevolent.jbot.virtual.Virtual;
 import org.hibernate.ReplicationMode;
 import org.hibernate.Session;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -14,6 +18,7 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 import javax.persistence.*;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @javax.persistence.Entity
@@ -28,6 +33,29 @@ import java.util.stream.Collectors;
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class User extends TimedRow implements com.github.manevolent.jbot.user.User {
+    @Transient
+    private final CachedValue<com.github.manevolent.jbot.database.model.UserBan> banCachedValue =
+            new CachedValue<>(1000L, new Supplier<com.github.manevolent.jbot.database.model.UserBan>() {
+                @Override
+                public com.github.manevolent.jbot.database.model.UserBan get() {
+                    return database.execute(s -> {
+                        return s.createQuery(
+                                "SELECT x FROM " +
+                                        com.github.manevolent.jbot.database.model.UserBan.class.getName() + " x " +
+                                        "inner join x.user u " +
+                                        "where u.userId = :userId and x.end > :time and x.pardoned = false " +
+                                        "order by x.end desc",
+                                com.github.manevolent.jbot.database.model.UserBan.class
+                        )
+                                .setParameter("userId", getUserId())
+                                .setParameter("time", (int) (System.currentTimeMillis() / 1000L))
+                                .setMaxResults(1)
+                                .getResultList()
+                                .stream().findFirst().orElse(null);
+                    });
+                }
+            });
+
     @Transient
     private final com.github.manevolent.jbot.database.Database database;
     public User(com.github.manevolent.jbot.database.Database database) {
@@ -141,6 +169,7 @@ public class User extends TimedRow implements com.github.manevolent.jbot.user.Us
                             "where p.id = :platformId and x.id = :userId",
                     com.github.manevolent.jbot.database.model.UserAssociation.class
             )
+                    .setMaxResults(1)
                     .setParameter("platformId", platform.getId())
                     .setParameter("userId", id)
                     .getResultList()
@@ -159,6 +188,78 @@ public class User extends TimedRow implements com.github.manevolent.jbot.user.Us
                     com.github.manevolent.jbot.database.model.UserAssociation.class
             ).setParameter("userId", getUserId()).getResultList();
         }));
+    }
+
+    @Override
+    public Collection<UserBan> getBans() {
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserBan.class.getName() + " x " +
+                            "inner join x.user u " +
+                            "where u.userId = :userId",
+                    com.github.manevolent.jbot.database.model.UserBan.class
+            ).setParameter("userId", getUserId()).getResultList();
+        }));
+    }
+
+    @Override
+    public Collection<UserBan> getIssuedBans() {
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.UserBan.class.getName() + " x " +
+                            "inner join x.banningUser u " +
+                            "where u.userId = :userId",
+                    com.github.manevolent.jbot.database.model.UserBan.class
+            ).setParameter("userId", getUserId()).getResultList();
+        }));
+    }
+
+    @Override
+    public UserBan getBan() {
+        // Cache this value so spamming doesn't spam queries
+        return banCachedValue.get();
+    }
+
+    @Override
+    public UserBan ban(String reason, Date date) throws SecurityException {
+        Permission.checkPermission("system.user.ban");
+
+        if (Virtual.getInstance().currentProcess().getUser() == this)
+            throw new SecurityException("Cannot ban own user");
+
+        if (getType() == UserType.SYSTEM &&
+                Virtual.getInstance().currentProcess().getUser().getType() != UserType.SYSTEM)
+            throw new SecurityException("Cannot ban system user");
+
+        if (getBan() != null)
+            throw new IllegalArgumentException("User is already banned");
+
+        User banningUser = (User) Virtual.getInstance().currentProcess().getUser();
+
+        try {
+            return database.executeTransaction(s -> {
+                User userAttached = s.find(User.class, getUserId());
+                User banningUserAttached = s.find(User.class, banningUser.getUserId());
+
+                com.github.manevolent.jbot.database.model.UserBan userBan =
+                        new com.github.manevolent.jbot.database.model.UserBan(
+                                database,
+                                userAttached,
+                                banningUserAttached,
+                                (int) (date.getTime() / 1000),
+                                reason
+                        );
+
+                s.persist(userBan);
+
+                // Unset ban cached value
+                banCachedValue.unset();
+
+                return userBan;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

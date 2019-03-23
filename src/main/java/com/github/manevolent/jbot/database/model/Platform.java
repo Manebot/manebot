@@ -66,6 +66,7 @@ public class Platform extends TimedRow implements com.github.manevolent.jbot.pla
                             "where p.id = :platformId and x.id = :userId",
                     com.github.manevolent.jbot.database.model.UserAssociation.class
             )
+                    .setMaxResults(1)
                     .setParameter("platformId", getId())
                     .setParameter("userId", id)
                     .getResultList()

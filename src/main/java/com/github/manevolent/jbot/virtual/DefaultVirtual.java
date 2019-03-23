@@ -176,11 +176,7 @@ public final class DefaultVirtual extends Virtual {
             if (this.user == user) return;
             if (user == null) throw new IllegalArgumentException("user", new NullPointerException());
 
-            try {
-                Permission.checkPermission("system.process.changeuser");
-            } catch (CommandAccessException e) {
-                throw new SecurityException(e);
-            }
+            Permission.checkPermission("system.process.changeuser");
 
             this.user = user;
             updateName();

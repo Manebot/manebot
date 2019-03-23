@@ -69,7 +69,7 @@ public class Conversation extends TimedRow implements com.github.manevolent.jbot
     }
 
     public String getId() {
-        return id;
+        return platform.getId() + ":" + id;
     }
 
     @Override
@@ -86,7 +86,7 @@ public class Conversation extends TimedRow implements com.github.manevolent.jbot
                 if (connection == null || !connection.isConnected())
                     throw new IllegalStateException("platform not connected: " + getPlatform().getId());
 
-                chat = connection.getChat(getId());
+                chat = connection.getChat(id);
             }
         }
 
@@ -94,6 +94,12 @@ public class Conversation extends TimedRow implements com.github.manevolent.jbot
             throw new IllegalStateException("chat not connected: " + getId());
 
         return chat;
+    }
+
+    @Override
+    public boolean isConnected() {
+        Chat chat = this.chat;
+        return chat != null && chat.isConnected();
     }
 
     public void setId(String id) {

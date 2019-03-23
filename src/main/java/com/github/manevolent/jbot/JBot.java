@@ -10,7 +10,6 @@ import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.command.DefaultCommandDispatcher;
 import com.github.manevolent.jbot.command.DefaultCommandManager;
 import com.github.manevolent.jbot.command.builtin.*;
-import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
 import com.github.manevolent.jbot.conversation.DefaultConversationProvider;
 import com.github.manevolent.jbot.database.DatabaseManager;
@@ -158,11 +157,7 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public void start() throws IllegalAccessException {
-        try {
-            com.github.manevolent.jbot.security.Permission.checkPermission("system.start");
-        } catch (CommandAccessException e) {
-            throw new IllegalAccessException(e.getMessage());
-        }
+        com.github.manevolent.jbot.security.Permission.checkPermission("system.start");
 
         synchronized (stateLock) {
             BotState state = getState();
@@ -180,6 +175,8 @@ public final class JBot implements Bot, Runnable {
 
             // Start all auto-start plugins
             for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
+                if (!plugin.getRegistration().willAutoStart()) continue;
+
                 try {
                     plugin.setEnabled(true);
                 } catch (PluginException e) {
@@ -197,11 +194,7 @@ public final class JBot implements Bot, Runnable {
 
     @Override
     public void stop() throws IllegalAccessException {
-        try {
-            com.github.manevolent.jbot.security.Permission.checkPermission("system.stop");
-        } catch (CommandAccessException e) {
-            throw new IllegalAccessException(e.getMessage());
-        }
+        com.github.manevolent.jbot.security.Permission.checkPermission("system.stop");
 
         synchronized (stateLock) {
             BotState state = getState();
@@ -328,8 +321,9 @@ public final class JBot implements Bot, Runnable {
                             model.registerEntity(UserAssociation.class);
                             model.registerEntity(Conversation.class);
                             model.registerEntity(UserGroup.class);
-                            model.registerEntity(PluginConfiguration.class);
+                            model.registerEntity(PluginProperty.class);
                             model.registerEntity(UserBan.class);
+                            model.registerEntity(Property.class);
 
                             return model.define();
                         });
@@ -396,8 +390,6 @@ public final class JBot implements Bot, Runnable {
                 }
             }
 
-            user.setType(UserType.SYSTEM);
-
             logger.info("Logged in as " + user.getName() + ".");
 
             Virtual.setInstance(new DefaultVirtual(user));
@@ -410,21 +402,34 @@ public final class JBot implements Bot, Runnable {
                     bot.platformManager
             );
 
-            bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager));
+            // Builtin commands:
+            bot.commandManager.registerExecutor("runas",
+                    new RunasCommand(bot.userManager, bot.commandDispatcher)).alias("as");
+            bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager)).alias("h");
+            bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
             bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager));
-            bot.commandManager.registerExecutor("version", new VersionCommand(bot));
+            bot.commandManager.registerExecutor("version", new VersionCommand(bot)).alias("ver");
             bot.commandManager.registerExecutor("platform", new PlatformCommand(bot.platformManager));
             bot.commandManager.registerExecutor("chat", new ChatCommand(bot.platformManager));
+            bot.commandManager.registerExecutor("conversation",
+                    new ConversationCommand(bot.conversationProvider)).alias("conv");
             bot.commandManager.registerExecutor("user", new UserCommand(bot.platformManager, bot.userManager));
             bot.commandManager.registerExecutor("group", new GroupCommand(bot.userManager));
-            bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
+            bot.commandManager.registerExecutor("ban", new BanCommand(bot.userManager));
+            bot.commandManager.registerExecutor("unban", new UnbanCommand(bot.userManager));
+            bot.commandManager.registerExecutor("permission",
+                    new PermissionCommand(bot.userManager, bot.conversationProvider)).alias("perm");
+            bot.commandManager.registerExecutor("runtime", new RuntimeCommand());
+            bot.commandManager.registerExecutor("nickname", new NicknameCommand(bot.userManager)).alias("nick");
+            bot.commandManager.registerExecutor("property",
+                    new PropertyCommand(bot.userManager,  bot.conversationProvider)).alias("prop");
 
+            // Console:
             Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
             PlatformRegistration consolePlatformRegistration = platformBuilder
                     .id("console").name("Console")
                     .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))
                     .register(null);
-            // Ensure registered to stdin
             user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
             consolePlatformRegistration.getConnection().connect();
 

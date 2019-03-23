@@ -49,6 +49,11 @@ public class ChatCommand extends AnnotatedCommandExecutor {
         ).send();
     }
 
+    @Command(description = "Gets current chat information", permission = "system.chat.info")
+    public void info(CommandSender sender) throws CommandExecutionException {
+        info(sender, sender.getChat());
+    }
+
     @Command(description = "Gets chat information", permission = "system.chat.info")
     public void info(CommandSender sender,
                      @CommandArgumentLabel.Argument(label = "info") String info,
@@ -63,19 +68,89 @@ public class ChatCommand extends AnnotatedCommandExecutor {
             throw new CommandArgumentException("Platform is not connected.");
 
         Chat chatInstance = platform.getConnection().getChat(chatId);
+        if (chatInstance == null)
+            throw new CommandArgumentException("Chat not found.");
 
+        info(sender, chatInstance);
+    }
+
+    @Command(description = "Adds platform user to a chat", permission = "system.chat.member.add")
+    public void addMember(CommandSender sender,
+                    @CommandArgumentLabel.Argument(label = "member") String member,
+                    @CommandArgumentLabel.Argument(label = "add") String add,
+                    @CommandArgumentString.Argument(label = "platform id") String platformId,
+                    @CommandArgumentString.Argument(label = "chat id") String chatId,
+                    @CommandArgumentString.Argument(label = "user id") String userId)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null)
+            throw new CommandArgumentException("Platform not found.");
+
+        if (!platform.isConnected())
+            throw new CommandArgumentException("Platform is not connected.");
+
+        PlatformUser platformUser = platform.getConnection().getPlatformUser(userId);
+        if (platformUser == null)
+            throw new CommandArgumentException("Platform user not found.");
+
+        Chat chatInstance = platform.getConnection().getChat(chatId);
+        if (chatInstance == null)
+            throw new CommandArgumentException("Chat not found.");
+
+        try {
+            chatInstance.addMember(platformUser);
+        } catch (UnsupportedOperationException ex) {
+            throw new CommandArgumentException("Chat does not support adding members.");
+        }
+
+        sender.sendMessage("Added user " + platformUser.getNickname() + ".");
+    }
+
+    @Command(description = "Removes platform user from a chat", permission = "system.chat.member.remove")
+    public void removeMember(CommandSender sender,
+                          @CommandArgumentLabel.Argument(label = "member") String member,
+                          @CommandArgumentLabel.Argument(label = "remove") String add,
+                          @CommandArgumentString.Argument(label = "platform id") String platformId,
+                          @CommandArgumentString.Argument(label = "chat id") String chatId,
+                          @CommandArgumentString.Argument(label = "user id") String userId)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null)
+            throw new CommandArgumentException("Platform not found.");
+
+        if (!platform.isConnected())
+            throw new CommandArgumentException("Platform is not connected.");
+
+        PlatformUser platformUser = platform.getConnection().getPlatformUser(userId);
+        if (platformUser == null)
+            throw new CommandArgumentException("Platform user not found.");
+
+        Chat chatInstance = platform.getConnection().getChat(chatId);
+        if (chatInstance == null)
+            throw new CommandArgumentException("Chat not found.");
+
+        try {
+            chatInstance.removeMember(platformUser);
+        } catch (UnsupportedOperationException ex) {
+            throw new CommandArgumentException("Chat does not support removing members.");
+        }
+
+        sender.sendMessage("Removed user " + platformUser.getNickname() + ".");
+    }
+
+    private void info(CommandSender sender, Chat chat) throws CommandExecutionException {
         sender.details(builder -> {
-            builder.name("Chat").key(chatInstance.getId());
-            builder.item("Platform", platform.getId());
+            builder.name("Chat").key(chat.getId());
+            builder.item("Platform", chat.getPlatform().getId());
 
-            if (chatInstance.isConnected()) {
+            if (chat.isConnected()) {
                 builder.item("Connected", "true");
-                builder.item("Private", Boolean.toString(chatInstance.isPrivate()));
-                builder.item("Buffered", Boolean.toString(chatInstance.isBuffered()));
-                builder.item("Command prefixes", chatInstance.getCommandPrefixes());
-                builder.item("Platform users", chatInstance.getPlatformUsers()
+                builder.item("Private", Boolean.toString(chat.isPrivate()));
+                builder.item("Buffered", Boolean.toString(chat.isBuffered()));
+                builder.item("Command prefixes", chat.getCommandPrefixes());
+                builder.item("Platform users", chat.getPlatformUsers()
                         .stream().map(PlatformUser::getNickname).collect(Collectors.toList()));
-                builder.item("Bot users", chatInstance.getUsers()
+                builder.item("Bot users", chat.getUsers()
                         .stream().map(User::getDisplayName).collect(Collectors.toList()));
             } else {
                 builder.item("Connected", "false");

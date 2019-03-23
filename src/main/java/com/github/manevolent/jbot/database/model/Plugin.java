@@ -1,10 +1,14 @@
 package com.github.manevolent.jbot.database.model;
 
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
+import com.github.manevolent.jbot.plugin.PluginProperty;
 import com.github.manevolent.jbot.plugin.PluginRegistration;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
+import java.sql.SQLException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 
 @javax.persistence.Entity
@@ -49,12 +53,6 @@ public class Plugin extends TimedRow {
     @Column(nullable = false)
     private boolean enabled;
 
-    @OneToMany(mappedBy = "plugin")
-    private Set<Database> databases;
-
-    @OneToMany(mappedBy = "plugin")
-    private Set<PluginConfiguration> pluginConfigurations;
-
     public int getPluginId() {
         return pluginId;
     }
@@ -77,14 +75,6 @@ public class Plugin extends TimedRow {
         this.enabled = enabled;
     }
 
-    public Set<Database> getDatabases() {
-        return databases;
-    }
-
-    public Set<PluginConfiguration> getPluginConfigurations() {
-        return pluginConfigurations;
-    }
-
     @Override
     public int hashCode() {
         return Integer.hashCode(pluginId);
@@ -96,5 +86,64 @@ public class Plugin extends TimedRow {
 
     public void setRegistration(PluginRegistration registration) {
         this.registration = registration;
+    }
+
+    public Collection<PluginProperty> getProperties() {
+        return Collections.unmodifiableCollection(database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.PluginProperty.class.getName()
+                            + " x " +
+                            "inner join x.plugin p "+
+                            "where p.pluginId = :pluginId",
+                    com.github.manevolent.jbot.database.model.PluginProperty.class
+            ).setParameter("pluginId", getPluginId()).getResultList();
+        }));
+    }
+
+    public com.github.manevolent.jbot.database.model.PluginProperty getProperty(String name) {
+        return database.execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + com.github.manevolent.jbot.database.model.PluginProperty.class.getName()
+                            + " x " +
+                            "inner join x.plugin p "+
+                            "where p.pluginId = :pluginId and x.name = :name",
+                    com.github.manevolent.jbot.database.model.PluginProperty.class
+            ).setParameter("pluginId", getPluginId()).setParameter("name", name)
+                    .getResultList()
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        });
+    }
+
+    public void setProperty(String name, String value) {
+        com.github.manevolent.jbot.database.model.PluginProperty property = getProperty(name);
+        if (property != null) {
+            if (value != null)
+                property.setValue(value);
+            else {
+                property.remove();
+            }
+
+            return;
+        }
+
+        if (value != null) {
+            try {
+                database.executeTransaction(s -> {
+                    com.github.manevolent.jbot.database.model.PluginProperty newProperty =
+                            new com.github.manevolent.jbot.database.model.PluginProperty(
+                                    database,
+                                    s.find(Plugin.class, getPluginId()),
+                                    name,
+                                    value
+                            );
+
+                    s.persist(newProperty);
+                });
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

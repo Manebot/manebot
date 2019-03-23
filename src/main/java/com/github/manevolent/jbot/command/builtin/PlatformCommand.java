@@ -1,6 +1,5 @@
 package com.github.manevolent.jbot.command.builtin;
 
-import com.github.manevolent.jbot.chat.Chat;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
@@ -8,16 +7,10 @@ import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecu
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
-import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentSwitch;
-import com.github.manevolent.jbot.command.response.CommandDetailsResponse;
-import com.github.manevolent.jbot.command.response.CommandListResponse;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformManager;
-import com.github.manevolent.jbot.platform.PlatformUser;
-import com.github.manevolent.jbot.user.*;
 
-import java.util.*;
-import java.util.function.Function;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class PlatformCommand extends AnnotatedCommandExecutor {

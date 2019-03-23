@@ -1,7 +1,6 @@
 package com.github.manevolent.jbot.command.builtin;
 
 import com.github.manevolent.jbot.Bot;
-import com.github.manevolent.jbot.BuildInformation;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;

@@ -2,7 +2,10 @@ package com.github.manevolent.jbot.command;
 
 import com.github.manevolent.jbot.command.executor.CommandExecutor;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class DefaultCommandManager extends CommandManager {
     private final Map<String, Registration> registrations = new LinkedHashMap<>();

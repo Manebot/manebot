@@ -9,7 +9,6 @@ import javax.persistence.*;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
 
 @javax.persistence.Entity
 @Table(

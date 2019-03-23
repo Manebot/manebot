@@ -1,17 +1,13 @@
 package com.github.manevolent.jbot.command.builtin;
 
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
-import com.github.manevolent.jbot.chat.ChatSender;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
 import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecutor;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
-
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
-
-import com.github.manevolent.jbot.command.response.CommandListResponse;
 import com.github.manevolent.jbot.database.Database;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.plugin.*;

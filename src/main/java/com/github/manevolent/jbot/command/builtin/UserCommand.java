@@ -8,7 +8,6 @@ import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgum
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentSwitch;
-
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.user.*;

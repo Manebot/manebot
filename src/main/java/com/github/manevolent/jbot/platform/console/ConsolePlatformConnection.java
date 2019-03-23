@@ -2,8 +2,6 @@ package com.github.manevolent.jbot.platform.console;
 
 import com.github.manevolent.jbot.JBot;
 import com.github.manevolent.jbot.chat.*;
-import com.github.manevolent.jbot.chat.exception.ChatException;
-import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformConnection;
 import com.github.manevolent.jbot.platform.PlatformUser;
@@ -19,7 +17,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class ConsolePlatformConnection implements PlatformConnection {
     public static final String CONSOLE_UID = "stdin";

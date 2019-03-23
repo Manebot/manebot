@@ -1,23 +1,22 @@
 package com.github.manevolent.jbot.database.model;
 
 import com.github.manevolent.jbot.cache.CachedValue;
-import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.security.Grant;
 import com.github.manevolent.jbot.security.GrantedPermission;
 import com.github.manevolent.jbot.security.Permission;
 import com.github.manevolent.jbot.user.UserBan;
-import com.github.manevolent.jbot.user.UserGroup;
 import com.github.manevolent.jbot.user.UserGroupMembership;
 import com.github.manevolent.jbot.user.UserType;
 import com.github.manevolent.jbot.virtual.Virtual;
-import org.hibernate.ReplicationMode;
-import org.hibernate.Session;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 

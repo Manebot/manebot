@@ -6,7 +6,6 @@ import com.github.manevolent.jbot.platform.PlatformRegistration;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 import javax.persistence.*;
-import java.util.Set;
 
 @javax.persistence.Entity
 @Table(

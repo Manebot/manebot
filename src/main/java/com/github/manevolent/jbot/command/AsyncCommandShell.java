@@ -5,7 +5,10 @@ import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.virtual.Virtual;
 import com.github.manevolent.jbot.virtual.VirtualProcess;
 
-import java.util.concurrent.*;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 

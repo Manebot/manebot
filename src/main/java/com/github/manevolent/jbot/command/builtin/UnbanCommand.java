@@ -4,16 +4,10 @@ import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;
 import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecutor;
-import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentFollowing;
-import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
-import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
 import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.user.UserBan;
 import com.github.manevolent.jbot.user.UserManager;
-
-import java.util.ArrayList;
-import java.util.Date;
 
 public class UnbanCommand extends AnnotatedCommandExecutor {
     private final UserManager userManager;

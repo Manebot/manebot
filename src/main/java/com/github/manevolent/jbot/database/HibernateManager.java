@@ -12,7 +12,6 @@ import org.hibernate.type.Type;
 import javax.persistence.EntityManager;
 import javax.persistence.Id;
 import java.io.Serializable;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.*;

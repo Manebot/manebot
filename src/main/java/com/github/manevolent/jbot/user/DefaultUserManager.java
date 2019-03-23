@@ -11,7 +11,9 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
 public final class DefaultUserManager implements UserManager {
     private static final Class<com.github.manevolent.jbot.database.model.User> userClass

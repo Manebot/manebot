@@ -37,7 +37,7 @@ public class RunasCommand extends AnnotatedCommandExecutor {
         User user = userManager.getUserByDisplayName(username);
         if (user == null) throw new CommandArgumentException("User not found");
 
-        commandDispatcher.execute(new CommandMessage(
+        commandDispatcher.executeAsync(new CommandMessage(
                 new ReceivedChatMessage() {
                     final Date date = Calendar.getInstance().getTime();
 

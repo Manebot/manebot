@@ -1,6 +1,5 @@
 package com.github.manevolent.jbot.virtual;
 
-import com.github.manevolent.jbot.command.exception.CommandAccessException;
 import com.github.manevolent.jbot.security.Permission;
 import com.github.manevolent.jbot.user.User;
 

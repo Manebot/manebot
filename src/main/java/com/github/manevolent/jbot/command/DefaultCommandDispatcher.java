@@ -4,7 +4,6 @@ import com.github.manevolent.jbot.command.exception.CommandExecutionException;
 import com.github.manevolent.jbot.event.EventDispatcher;
 import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.chat.CommandMessageReceivedEvent;
-
 import com.github.manevolent.jbot.user.User;
 import com.google.common.collect.MapMaker;
 

@@ -1,12 +1,10 @@
 import com.github.manevolent.jbot.artifact.Artifact;
 import com.github.manevolent.jbot.artifact.ArtifactManifest;
-import com.github.manevolent.jbot.artifact.LocalArtifact;
 import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
 import junit.framework.TestCase;
 import org.eclipse.aether.repository.RemoteRepository;
 
 import java.io.File;
-import java.util.Collection;
 import java.util.Collections;
 
 public class ArtifactLatestVersionTest extends TestCase {

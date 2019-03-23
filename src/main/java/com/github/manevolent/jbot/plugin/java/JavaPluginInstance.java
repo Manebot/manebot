@@ -10,7 +10,6 @@ import com.github.manevolent.jbot.plugin.java.classloader.LocalClassLoader;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.jar.Manifest;
 
 public final class JavaPluginInstance {
     private final LocalArtifact artifact;

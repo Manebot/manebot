@@ -9,8 +9,11 @@ import com.github.manevolent.jbot.event.EventDispatcher;
 import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.command.CommandExecutionEvent;
 import com.github.manevolent.jbot.user.User;
+import com.github.manevolent.jbot.user.UserBan;
 
-import java.util.*;
+import java.util.Calendar;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -58,6 +61,18 @@ abstract class CommandShell {
                 );
             } catch (EventExecutionException e) {
                 throw new CommandExecutionException(e);
+            }
+
+            UserBan ban = getUser().getBan();
+            if (ban != null && !ban.isPardoned()) {
+                if (ban.getReason() != null)
+                    throw new CommandAccessException("You have been banned until " +
+                            ban.getEnd() + " by " +
+                            ban.getBanningUser().getDisplayName() + " (" + ban.getReason() + ")");
+                else
+                    throw new CommandAccessException("You have been banned until " +
+                            ban.getEnd() + " by " +
+                            ban.getBanningUser().getDisplayName());
             }
 
             if (executor.isBuffered() && commandMessage.getSender().getChat().isBuffered())

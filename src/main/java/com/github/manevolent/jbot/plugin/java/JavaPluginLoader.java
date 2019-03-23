@@ -5,8 +5,10 @@ import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.database.DatabaseManager;
 import com.github.manevolent.jbot.event.EventManager;
 import com.github.manevolent.jbot.platform.PlatformManager;
-import com.github.manevolent.jbot.plugin.*;
-
+import com.github.manevolent.jbot.plugin.Plugin;
+import com.github.manevolent.jbot.plugin.PluginException;
+import com.github.manevolent.jbot.plugin.PluginLoadException;
+import com.github.manevolent.jbot.plugin.PluginManager;
 import com.github.manevolent.jbot.plugin.java.classloader.ClassSource;
 import com.github.manevolent.jbot.plugin.java.classloader.LocalClassLoader;
 import com.github.manevolent.jbot.plugin.java.classloader.LocalURLClassLoader;
@@ -15,10 +17,8 @@ import com.github.manevolent.jbot.virtual.Virtual;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.io.FileNotFoundException;
-
 import java.io.IOException;
 import java.io.InputStream;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;

@@ -1,6 +1,5 @@
 package com.github.manevolent.jbot.command.builtin;
 
-import com.github.manevolent.jbot.chat.Chat;
 import com.github.manevolent.jbot.command.CommandSender;
 import com.github.manevolent.jbot.command.exception.CommandArgumentException;
 import com.github.manevolent.jbot.command.exception.CommandExecutionException;

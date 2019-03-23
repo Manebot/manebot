@@ -10,7 +10,7 @@ import com.github.manevolent.jbot.event.chat.ChatMessageReceivedEvent;
 import com.github.manevolent.jbot.event.chat.ChatUnknownUserEvent;
 import com.github.manevolent.jbot.user.UserAssociation;
 
-import java.util.concurrent.*;
+import java.util.concurrent.Future;
 
 public class DefaultChatDispatcher implements ChatDispatcher {
     private final JBot bot;

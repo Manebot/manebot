@@ -7,14 +7,11 @@ import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecu
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
-import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentSwitch;
-import com.github.manevolent.jbot.platform.Platform;
-import com.github.manevolent.jbot.platform.PlatformManager;
-import com.github.manevolent.jbot.user.*;
+import com.github.manevolent.jbot.user.User;
+import com.github.manevolent.jbot.user.UserGroup;
+import com.github.manevolent.jbot.user.UserManager;
 
 import java.util.Comparator;
-import java.util.Date;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class GroupCommand extends AnnotatedCommandExecutor {

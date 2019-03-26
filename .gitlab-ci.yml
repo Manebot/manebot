@@ -2,7 +2,7 @@ image: maven:latest
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
-  - .m2/
+  - mvn/
   
 before_script:
   # Install JFrog CLI
@@ -25,7 +25,5 @@ build:
     - ./jfrog rt bce gitlabci-maven-artifactory $CI_JOB_ID
     # Pass the build information to Artifactory
     - ./jfrog rt bp gitlabci-maven-artifactory $CI_JOB_ID
-    - ls -al ./mvn
-    - ls -al /usr/share/maven
   only:
     - test

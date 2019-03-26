@@ -8,22 +8,66 @@ import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgum
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentSwitch;
+import com.github.manevolent.jbot.command.response.CommandListResponse;
+import com.github.manevolent.jbot.command.search.CommandArgumentSearch;
+import com.github.manevolent.jbot.database.Database;
+import com.github.manevolent.jbot.database.search.*;
+import com.github.manevolent.jbot.database.search.handler.*;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.user.*;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class UserCommand extends AnnotatedCommandExecutor {
     private final PlatformManager platformManager;
     private final UserManager userManager;
+    private final Database database;
 
-    public UserCommand(PlatformManager platformManager, UserManager userManager) {
+    private final SearchHandler<com.github.manevolent.jbot.database.model.User> searchHandler;
+
+    public UserCommand(PlatformManager platformManager, UserManager userManager, Database database) {
         this.platformManager = platformManager;
         this.userManager = userManager;
+        this.database = database;
+
+        this.searchHandler = database
+                .createSearchHandler(com.github.manevolent.jbot.database.model.User.class)
+                .string(new ComparingSearchHandler(
+                            new SearchHandlerPropertyEquals("username"),
+                            new SearchHandlerPropertyContains("displayName"),
+                            SearchOperator.INCLUDE))
+                .command("unnamed", new SearchHandlerPropertyIsNull("displayName"))
+                .argument("group", new SearchHandlerPropertyIn("userId",
+                        root -> root.get("user").get("userId"),
+                        com.github.manevolent.jbot.database.model.UserGroup.class,
+                        new SearchHandlerPropertyEquals(root -> root.get("group").get("name"))
+                ))
+                .build();
+    }
+
+    @Command(description = "Searches users", permission = "system.user.search")
+    public void search(CommandSender sender,
+                     @CommandArgumentLabel.Argument(label = "search") String search,
+                     @CommandArgumentSearch.Argument Search query)
+            throws CommandExecutionException {
+        try {
+            sender.list(
+                    com.github.manevolent.jbot.database.model.User.class,
+                    searchHandler.search(query, 6),
+                    (sender1, user) -> user.getDisplayName()
+            ).send();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Command(description = "Lists users", permission = "system.user.list")

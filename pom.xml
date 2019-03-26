@@ -16,7 +16,8 @@
     </repositories>
 
     <properties>
-        <apiVersion>0.1.1</apiVersion>
+        <apiVersion>0.1.6</apiVersion>
+
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
         <mavenVersion>3.3.9</mavenVersion>
@@ -75,7 +76,7 @@
         <dependency>
             <groupId>com.github.manevolent</groupId>
             <artifactId>jbot-core</artifactId>
-            <version>de12cf1ae852fdaa27ae3347207827ae780c2e57</version>
+            <version>290efc6603c82399bf62369060f5b9310d1a799d</version>
         </dependency>
 
         <dependency>

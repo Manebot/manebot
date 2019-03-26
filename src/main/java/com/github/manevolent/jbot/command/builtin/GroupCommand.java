@@ -7,18 +7,64 @@ import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecu
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
+import com.github.manevolent.jbot.command.search.CommandArgumentSearch;
+import com.github.manevolent.jbot.database.Database;
+import com.github.manevolent.jbot.database.expressions.ExtendedExpressions;
+import com.github.manevolent.jbot.database.expressions.MatchMode;
+import com.github.manevolent.jbot.database.model.Group;
+import com.github.manevolent.jbot.database.model.Platform;
+import com.github.manevolent.jbot.database.search.*;
+import com.github.manevolent.jbot.database.search.handler.*;
 import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.user.UserGroup;
 import com.github.manevolent.jbot.user.UserManager;
 
+import javax.persistence.criteria.*;
+import java.sql.SQLException;
 import java.util.Comparator;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class GroupCommand extends AnnotatedCommandExecutor {
     private final UserManager userManager;
+    private final SearchHandler<Group> searchHandler;
 
-    public GroupCommand(UserManager userManager) {
+    public GroupCommand(UserManager userManager, Database database) {
         this.userManager = userManager;
+
+        this.searchHandler = database.createSearchHandler(Group.class)
+                .string(new SearchHandlerPropertyContains("name"))
+                .argument("owner", new ComparingSearchHandler(
+                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("displayName")),
+                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("username")),
+                        SearchOperator.INCLUDE))
+                .argument("member", new SearchHandlerPropertyIn("groupId",
+                        root -> root.get("group").get("groupId"),
+                        com.github.manevolent.jbot.database.model.UserGroup.class,
+                        new ComparingSearchHandler(
+                                new SearchHandlerPropertyEquals(root -> root.get("user").get("username")),
+                                new SearchHandlerPropertyContains(root -> root.get("user").get("displayName")),
+                                SearchOperator.INCLUDE
+                        )
+                ))
+                .build();
+    }
+
+    @Command(description = "Searches groups", permission = "system.group.search")
+    public void search(CommandSender sender,
+                       @CommandArgumentLabel.Argument(label = "search") String search,
+                       @CommandArgumentSearch.Argument Search query)
+            throws CommandExecutionException {
+        try {
+            sender.list(
+                    com.github.manevolent.jbot.database.model.Group.class,
+                    searchHandler.search(query, 6),
+                    (sender1, group) -> group.getName() + " (" + group.getUsers().size() +
+                            " users, owned by " + group.getOwner().getDisplayName() + ")"
+            ).send();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Command(description = "Lists groups", permission = "system.group.list")

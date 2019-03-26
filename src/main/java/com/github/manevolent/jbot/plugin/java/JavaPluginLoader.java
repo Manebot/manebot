@@ -1,5 +1,6 @@
 package com.github.manevolent.jbot.plugin.java;
 
+import com.github.manevolent.jbot.Version;
 import com.github.manevolent.jbot.artifact.*;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.database.DatabaseManager;
@@ -24,6 +25,8 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public final class JavaPluginLoader implements PluginLoader {
@@ -53,9 +56,117 @@ public final class JavaPluginLoader implements PluginLoader {
         this.apiVersion = apiVersion;
     }
 
-    private JavaPluginInstance loadIntl(LocalArtifact artifact) throws PluginLoadException, FileNotFoundException {
-        if (pluginInstances.containsKey(artifact.getIdentifier()))
-            return pluginInstances.get(artifact.getIdentifier());
+    private Collection<LocalArtifact> obtainDependencyTree(ArtifactDependency dependency,
+                                                           Set<String> mavenIdentifiers)
+            throws ArtifactRepositoryException {
+        List<LocalArtifact> artifacts = new LinkedList<>();
+
+        if (mavenIdentifiers.contains(dependency.getChild().toString())) {
+            return artifacts;
+        }
+
+        if (!dependency.getChild().hasObtained())
+            Virtual.getInstance().currentProcess().getLogger().info(
+                    "Downloading dependency " + dependency.getChild().toString()
+                            + " for " + dependency.getChild().toString() + "..."
+            );
+
+        try {
+            artifacts.add(dependency.getChild().obtain());
+        } catch (ArtifactRepositoryException ex) {
+            if (dependency.isRequired()) throw ex;
+            else {
+                Virtual.getInstance().currentProcess().getLogger().log(
+                        Level.WARNING,
+                        "Failed to download optional dependency " + dependency.getChild().toString()
+                                + " for " + dependency.getChild().toString() + "...",
+                        ex
+                );
+
+                return Collections.emptyList();
+            }
+        }
+
+        for (ArtifactDependency child : dependency.getChild().getDependencies()) {
+            switch (dependency.getType()) {
+                case COMPILE:
+                case RUN:
+                    Collection<LocalArtifact> obtainedDependencies = obtainDependencyTree(child, mavenIdentifiers);
+                    artifacts.addAll(obtainedDependencies);
+                    mavenIdentifiers.addAll(
+                            obtainedDependencies.stream()
+                            .map(LocalArtifact::toString)
+                            .collect(Collectors.toList())
+                    );
+                    break;
+            }
+        }
+
+        return artifacts;
+    }
+
+    @Override
+    public Collection<ArtifactDependency> getDependencies(Artifact artifact) {
+        Collection<ArtifactDependency> dependencyDefinitions = artifact.getDependencies();
+        Collection<ArtifactDependency> pluginDependencies = new LinkedList<>();
+
+        for (ArtifactDependency dependency : dependencyDefinitions) {
+            ArtifactIdentifier dependencyIdentifier = dependency.getChild().getIdentifier();
+            switch (dependency.getType()) {
+                case PROVIDED:
+                    ManifestIdentifier dependencyManifestIdentifier = dependencyIdentifier.withoutVersion();
+                    if (coreDependency.equals(dependencyManifestIdentifier))
+                        continue;
+                    pluginDependencies.add(dependency);
+                    break;
+            }
+        }
+
+        return pluginDependencies;
+    }
+
+    private JavaPluginInstance loadIntl(LocalArtifact artifact) throws PluginLoadException {
+        if (pluginInstances.containsKey(artifact.getIdentifier().withoutVersion())) {
+            JavaPluginInstance instance = pluginInstances.get(artifact.getIdentifier().withoutVersion());
+
+            // Check to see if the classloader has booted this Plugin instance.  If it has, there is nothing we can do.
+            // We cannot unloaded classes that have already been loaded into the JRE.
+            if (instance.isLoaded()) {
+                // This plugin is loaded, check the version we are trying to load.
+                Version attempted;
+                try {
+                    attempted = Version.fromString(artifact.getVersion());
+                } catch (IllegalArgumentException ex) {
+                    // You're on your own here.
+                    return instance;
+                }
+
+                Version loaded;
+                try {
+                    loaded = Version.fromString(instance.getArtifact().getVersion());
+                } catch (IllegalArgumentException ex) {
+                    // You're on your own here.
+                    return instance;
+                }
+
+                if (attempted.compareTo(loaded) < 0)
+                    throw new PluginLoadException(
+                            "Attempted to load " + artifact.getIdentifier() + ", but " +
+                            artifact.getIdentifier().withoutVersion()
+                            + " was already loaded previously with later version " + loaded.toString() + "."
+                    );
+
+                if (!attempted.equals(loaded))
+                    Logger.getGlobal().warning(
+                            "Instead of loading " + artifact.getIdentifier() + ", shadowing with version " +
+                                    loaded + " as it is already in the classloader."
+                    );
+
+                return instance;
+            }
+        }
+
+        Logger.getGlobal().info("Loading " + artifact.toString() + "...");
 
         // Transform the JAR/CLASS file into a URL for a URLClassLoader and instantiate pluginClassLoader.
         final URL classpathUrl;
@@ -104,18 +215,16 @@ public final class JavaPluginLoader implements PluginLoader {
                         ManifestIdentifier manifestIdentifier = dependencyIdentifier.withoutVersion();
                         if (coreDependency.equals(manifestIdentifier))
                             throw new PluginLoadException(
-                                    "Cannot overload dependency which is already provided: " +
+                                    "Cannot overload core API dependency which is already provided in " +
+                                            "the system classpath: " +
                                             dependencyIdentifier +
-                                            " (should this dependency be marked as \"provided\"?)"
+                                            " (this dependency be marked as \"provided\")"
                             );
 
-                        if (!dependencyArtifact.hasObtained())
-                            Virtual.getInstance().currentProcess().getLogger().info(
-                                    "Downloading dependency " + dependencyArtifact.getIdentifier()
-                                            + " for " + artifact.getIdentifier() + "..."
-                            );
-
-                        dependencies.add(dependencyArtifact.obtain().getFile().toURI().toURL());
+                        // Download dependency and sub-dependencies
+                        Collection<LocalArtifact> dependencyTree = obtainDependencyTree(dependency, new HashSet<>());
+                        for (LocalArtifact dependentArtifact : dependencyTree)
+                            dependencies.add(dependentArtifact.getFile().toURI().toURL());
                     } catch (ArtifactRepositoryException | MalformedURLException e) {
                         throw new PluginLoadException("Failed to load dependency artifact " + dependency.toString(), e);
                     }
@@ -164,10 +273,24 @@ public final class JavaPluginLoader implements PluginLoader {
                         try {
                             providedDependency = loadIntl(dependencyArtifact.obtain());
                         } catch (ArtifactRepositoryException e) {
-                            throw new PluginLoadException(
-                                    "Failed to load dependency artifact " + dependency.toString(),
+                            PluginLoadException exception = new PluginLoadException(
+                                    "Failed to load dependency artifact " + dependency.toString() + " for " +
+                                    " plugin " + artifact.getIdentifier(),
                                     e
                             );
+
+                            if (dependency.isRequired())
+                                throw exception;
+                            else {
+                                Logger.getGlobal().log(
+                                        Level.WARNING,
+                                        "Problem loading optional plugin dependency",
+                                        exception
+                                );
+
+                                // skip loading this plugin, as it's marked optional
+                                continue;
+                            }
                         }
                     }
 
@@ -175,7 +298,8 @@ public final class JavaPluginLoader implements PluginLoader {
                             dependencyManifestIdentifier,
                             new JavaPluginDependency(
                                     providedDependency, // The JavaPluginInstance we *want* to use, which may not be possible
-                                    new DefaultArtifactVersion(dependencyIdentifier.getVersion())
+                                    new DefaultArtifactVersion(dependencyIdentifier.getVersion()),
+                                    dependency
                             ));
 
                     break;
@@ -195,15 +319,13 @@ public final class JavaPluginLoader implements PluginLoader {
         if (conflicts.size() > 0)
             throw new PluginLoadException(
                     artifact.getIdentifier() +
-                            " has shared dependency conflicts; update dependent plugins to resolve.",
-                    new IllegalArgumentException(
+                            " has shared dependency conflicts; update dependent plugins to resolve: " +
                             String.join(", ",
                                     conflicts.stream().map(conflict ->
                                             conflict.getInstance().getArtifact().getIdentifier().toString()
-                                            + " < required " +
-                                            conflict.getMinimumVersion().toString()).collect(Collectors.toList())
+                                                    + " < required " +
+                                                    conflict.getMinimumVersion().toString()).collect(Collectors.toList())
                             )
-                    )
             );
 
         // Load runtime dependencies
@@ -230,12 +352,40 @@ public final class JavaPluginLoader implements PluginLoader {
         // instance yet.  This is executed synchronously with this thread, as a future lambda.  We pass this into the
         // JavaPluginInstance for future execution by that class's load() method, opportunistically.
         final Map<ManifestIdentifier, Plugin> pluginDependencies = new LinkedHashMap<>();
-        Loader loader = classLoader -> {
-            for (JavaPluginDependency dependencyInstance : providedDependencies.values())
+        Loader loader = (javaPluginInstance, classLoader) -> {
+            for (JavaPluginDependency dependencyInstance : providedDependencies.values()) {
+                Plugin plugin;
+
+                try {
+                    plugin = dependencyInstance.getInstance().load();
+                } catch (Throwable e) {
+                    PluginLoadException exception = new PluginLoadException(
+                            "Problem loading non-optional plugin dependency " +
+                            dependencyInstance.getInstance().getArtifact().getIdentifier() + " for " +
+                            artifact.getIdentifier(),
+                            e
+                    );
+
+                    if (dependencyInstance.isRequired())
+                        throw exception;
+                    else {
+                        Virtual.getInstance().currentProcess().getLogger().log(
+                                Level.WARNING,
+                                "Problem loading plugin dependency",
+                                exception
+                        );
+
+                        continue;
+                    }
+                }
+
                 pluginDependencies.put(
                         dependencyInstance.getInstance().getArtifact().getIdentifier().withoutVersion(),
-                        dependencyInstance.getInstance().load()
+                        plugin
                 );
+
+                dependencyInstance.getInstance().addDepender(dependencyInstance);
+            }
 
             // Load plugin on a separate thread so that setContextClassLoader() works appropriately.
             CompletableFuture<PluginEntry> loaderFuture = new CompletableFuture<>();
@@ -287,10 +437,8 @@ public final class JavaPluginLoader implements PluginLoader {
                 throw new PluginLoadException(e);
             }
 
-            Virtual.getInstance().currentProcess().getLogger().info(
-                    "Loading Plugin " + artifact.getIdentifier() + "...");
-
-            Plugin.Builder builder = new JavaPlugin.Builder(
+            JavaPlugin.Builder builder = new JavaPlugin.Builder(
+                    javaPluginInstance,
                     platformManager,
                     commandManager,
                     pluginManager,
@@ -301,10 +449,13 @@ public final class JavaPluginLoader implements PluginLoader {
             );
 
             try {
-                Plugin plugin = pluginEntry.instantiate(builder);
+                JavaPlugin plugin = (JavaPlugin) pluginEntry.instantiate(builder);
 
-                Virtual.getInstance().currentProcess().getLogger().info(
-                        "Loaded Plugin " + artifact.getIdentifier() + ".");
+                for (JavaPluginDependency dependencyInstance : providedDependencies.values()) {
+                    dependencyInstance.getInstance().getPlugin()
+                            .getDependencyListeners()
+                            .forEach((listener) -> listener.accept(plugin));
+                }
 
                 return plugin;
             } catch (PluginException e) {
@@ -314,13 +465,16 @@ public final class JavaPluginLoader implements PluginLoader {
 
         JavaPluginInstance instance = new JavaPluginInstance(
                 artifact,
-                pluginClassLoader, ClassSource.URL_CLASS_SOURCE,
+                pluginClassLoader,
+                ClassSource.URL_CLASS_SOURCE,
                 libraryClassLoader,
                 loader,
                 providedDependencies
         );
 
         pluginInstances.put(artifact.getIdentifier().withoutVersion(), instance);
+
+        Logger.getGlobal().info("Loaded " + artifact.toString() + ".");
 
         return instance;
     }
@@ -331,6 +485,6 @@ public final class JavaPluginLoader implements PluginLoader {
     }
 
     public interface Loader {
-        Plugin load(ClassLoader classLoader) throws PluginLoadException;
+        JavaPlugin load(JavaPluginInstance javaPluginInstance, ClassLoader classLoader) throws PluginLoadException;
     }
 }

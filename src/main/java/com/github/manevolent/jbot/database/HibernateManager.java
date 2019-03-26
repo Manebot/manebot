@@ -2,6 +2,8 @@ package com.github.manevolent.jbot.database;
 
 import com.github.manevolent.jbot.Bot;
 import com.github.manevolent.jbot.JBot;
+import com.github.manevolent.jbot.database.search.DefaultSearchHandler;
+import com.github.manevolent.jbot.database.search.SearchHandler;
 import com.google.common.collect.MapMaker;
 import org.hibernate.*;
 import org.hibernate.boot.model.naming.*;
@@ -356,6 +358,11 @@ public class HibernateManager implements DatabaseManager {
         @Override
         public EntityManager openSession() {
             return sessionFactory.openSession();
+        }
+
+        @Override
+        public <T> SearchHandler.Builder<T> createSearchHandler(Class<T> aClass) throws IllegalArgumentException {
+            return new DefaultSearchHandler.Builder<>(this, aClass);
         }
 
         @Override

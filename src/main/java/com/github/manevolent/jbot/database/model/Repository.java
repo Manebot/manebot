@@ -8,9 +8,9 @@ import java.sql.SQLException;
 @javax.persistence.Entity
 @Table(
         indexes = {
-                @Index(columnList = "url", unique = true)
+                @Index(columnList = "id", unique = true)
         },
-        uniqueConstraints = {@UniqueConstraint(columnNames ={"url"})}
+        uniqueConstraints = {@UniqueConstraint(columnNames ={"id"})}
 )
 @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 public class Repository extends TimedRow {
@@ -21,9 +21,13 @@ public class Repository extends TimedRow {
     }
 
     public Repository(com.github.manevolent.jbot.database.Database database,
+                      String id,
+                      String type,
                       String url) {
         this(database);
 
+        this.id = id;
+        this.type = type;
         this.url = url;
     }
 
@@ -33,7 +37,17 @@ public class Repository extends TimedRow {
     private int repositoryId;
 
     @Column()
+    private String id;
+
+    @Column()
+    private String type;
+
+    @Column()
     private String url;
+
+    public String getUrl() {
+        return url;
+    }
 
     public int getRepositoryId() {
         return repositoryId;
@@ -55,7 +69,11 @@ public class Repository extends TimedRow {
         return Integer.hashCode(repositoryId);
     }
 
-    public String getUrl() {
-        return url;
+    public String getType() {
+        return type;
+    }
+
+    public String getId() {
+        return id;
     }
 }

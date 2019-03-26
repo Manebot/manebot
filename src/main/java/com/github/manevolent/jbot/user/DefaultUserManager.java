@@ -1,7 +1,8 @@
 package com.github.manevolent.jbot.user;
 
 import com.github.manevolent.jbot.database.Database;
-import com.github.manevolent.jbot.database.expressions.EscapedLike;
+import com.github.manevolent.jbot.database.expressions.ExtendedExpressions;
+import com.github.manevolent.jbot.database.expressions.MatchMode;
 import com.github.manevolent.jbot.database.model.Entity;
 import com.github.manevolent.jbot.database.model.EntityType;
 import com.github.manevolent.jbot.platform.Platform;
@@ -74,10 +75,9 @@ public final class DefaultUserManager implements UserManager {
 
             Root<com.github.manevolent.jbot.database.model.User> from = criteriaQuery.from(userClass);
             criteriaQuery.select(from);
-
             criteriaQuery.where(
                     cb.or(cb.equal(from.get("username"), displayName),
-                            cb.like(from.get("displayName"), EscapedLike.escape(displayName) + "%", '!'))
+                            ExtendedExpressions.escapedLike(cb, from.get("displayName"), displayName, MatchMode.START))
             );
 
             return s.createQuery(criteriaQuery).setMaxResults(1).getResultList().stream().findFirst().orElse(null);

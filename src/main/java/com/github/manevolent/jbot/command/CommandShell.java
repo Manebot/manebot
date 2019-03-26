@@ -8,6 +8,7 @@ import com.github.manevolent.jbot.command.executor.CommandExecutor;
 import com.github.manevolent.jbot.event.EventDispatcher;
 import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.command.CommandExecutionEvent;
+import com.github.manevolent.jbot.plugin.PluginException;
 import com.github.manevolent.jbot.user.User;
 import com.github.manevolent.jbot.user.UserBan;
 
@@ -133,7 +134,7 @@ abstract class CommandShell {
                 commandMessage.getSender().sendMessage("There was an unexpected problem executing the command.");
             }
         } catch (CommandExecutionException e) { // User error that we can describe safely
-            Logger.getGlobal().log(Level.WARNING, "Problem executing command", e);
+            //Logger.getGlobal().log(Level.WARNING, "Problem executing command", e);
             commandMessage.getSender().sendMessage("Problem executing command: " + e.getMessage());
         } finally {
             commandMessage.getSender().end();

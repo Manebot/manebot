@@ -8,20 +8,21 @@ import com.github.manevolent.jbot.plugin.java.classloader.ClassSource;
 import com.github.manevolent.jbot.plugin.java.classloader.JavaPluginClassLoader;
 import com.github.manevolent.jbot.plugin.java.classloader.LocalClassLoader;
 
-import java.util.Collection;
-import java.util.Map;
+import java.util.*;
 
 public final class JavaPluginInstance {
     private final LocalArtifact artifact;
     private final JavaPluginClassLoader classLoader;
     private final JavaPluginLoader.Loader pluginLoader;
     private final Map<ManifestIdentifier, JavaPluginDependency> dependencies;
+    private final Collection<JavaPluginDependency> dependers = new HashSet<>();
 
     private final Object loadLock = new Object();
-    private Plugin instance;
+    private JavaPlugin instance;
 
     JavaPluginInstance(LocalArtifact artifact,
-                       LocalClassLoader pluginClassLoader, ClassSource source,
+                       LocalClassLoader pluginClassLoader,
+                       ClassSource source,
                        LocalClassLoader libraryClassLoader,
                        JavaPluginLoader.Loader pluginLoader,
                        Map<ManifestIdentifier, JavaPluginDependency> dependencies) {
@@ -42,6 +43,18 @@ public final class JavaPluginInstance {
         return dependencies.get(manifestIdentifier);
     }
 
+    public void addDepender(JavaPluginDependency dependency) {
+        dependers.add(dependency);
+    }
+
+    public void removeDepender(JavaPluginDependency dependency) {
+        dependers.remove(dependency);
+    }
+
+    public Collection<JavaPluginDependency> getDependers() {
+        return Collections.unmodifiableCollection(dependers);
+    }
+
     public Collection<JavaPluginDependency> getDependencies() {
         return dependencies.values();
     }
@@ -54,16 +67,16 @@ public final class JavaPluginInstance {
         return instance != null;
     }
 
-    public Plugin load() throws PluginLoadException {
+    public JavaPlugin load() throws PluginLoadException {
         synchronized (loadLock) {
             if (!isLoaded())
-                this.instance = pluginLoader.load(classLoader);
+                this.instance = pluginLoader.load(this, classLoader);
         }
 
         return this.instance;
     }
 
-    public Plugin getPlugin() {
+    public JavaPlugin getPlugin() {
         return instance;
     }
 

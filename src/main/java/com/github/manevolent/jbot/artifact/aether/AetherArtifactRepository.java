@@ -51,8 +51,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
     }
 
     @Override
-    public ArtifactManifest getManifest(String packageId, String artifactId)
-            throws ArtifactRepositoryException, ArtifactNotFoundException {
+    public ArtifactManifest getManifest(String packageId, String artifactId) {
         return new AetherManifest(packageId, artifactId);
     }
 
@@ -198,6 +197,16 @@ public class AetherArtifactRepository implements ArtifactRepository {
         }
 
         @Override
+        public String getExtension() {
+            return descriptor.getArtifact().getExtension();
+        }
+
+        @Override
+        public String getClassifier() {
+            return descriptor.getArtifact().getClassifier();
+        }
+
+        @Override
         public String getVersion() {
             return version;
         }
@@ -270,7 +279,17 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
                 request.setArtifact(dependency.getArtifact());
 
-                request.setRepositories(AetherArtifactRepository.this.remoteRepositories);
+                List<RemoteRepository> dependingRepositories =
+                        parent != null ? parent.descriptor.getRepositories() : Collections.emptyList();
+
+                request.setRepositories(
+                        Stream.of(
+                                dependingRepositories,
+                                AetherArtifactRepository.this.remoteRepositories
+                        )
+                                .flatMap(Collection::stream)
+                                .collect(Collectors.toList())
+                );
 
                 ArtifactDescriptorResult result;
                 try {
@@ -317,10 +336,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
         }
 
         public boolean equals(AetherArtifact b) {
-            return b.descriptor.getArtifact().getGroupId().equals(descriptor.getArtifact().getGroupId()) &&
-                    b.descriptor.getArtifact().getArtifactId().equals(descriptor.getArtifact().getArtifactId()) &&
-                    b.descriptor.getArtifact().getClassifier().equals(descriptor.getArtifact().getClassifier()) &&
-                    b.descriptor.getArtifact().getVersion().equals(descriptor.getArtifact().getVersion());
+            return descriptor.getArtifact().toString().equals(b.descriptor.getArtifact().toString());
         }
     }
 

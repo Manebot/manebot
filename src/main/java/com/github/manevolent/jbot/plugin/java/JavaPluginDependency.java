@@ -1,14 +1,19 @@
 package com.github.manevolent.jbot.plugin.java;
 
+import com.github.manevolent.jbot.artifact.ArtifactDependency;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 
 public final class JavaPluginDependency {
     private final JavaPluginInstance instance;
     private final ArtifactVersion minimumVersion;
+    private final ArtifactDependency artifactDependency;
 
-    public JavaPluginDependency(JavaPluginInstance instance, ArtifactVersion minimumVersion) {
+    public JavaPluginDependency(JavaPluginInstance instance,
+                                ArtifactVersion minimumVersion,
+                                ArtifactDependency artifactDependency) {
         this.instance = instance;
         this.minimumVersion = minimumVersion;
+        this.artifactDependency = artifactDependency;
     }
 
     public JavaPluginInstance getInstance() {
@@ -17,5 +22,13 @@ public final class JavaPluginDependency {
 
     public ArtifactVersion getMinimumVersion() {
         return minimumVersion;
+    }
+
+    public boolean isRequired() {
+        return getArtifactDependency().isRequired();
+    }
+
+    public ArtifactDependency getArtifactDependency() {
+        return artifactDependency;
     }
 }

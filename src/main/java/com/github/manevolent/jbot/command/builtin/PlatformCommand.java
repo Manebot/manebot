@@ -7,17 +7,46 @@ import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecu
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
+import com.github.manevolent.jbot.command.search.CommandArgumentSearch;
+import com.github.manevolent.jbot.database.Database;
+import com.github.manevolent.jbot.database.model.Plugin;
+import com.github.manevolent.jbot.database.search.Search;
+import com.github.manevolent.jbot.database.search.SearchHandler;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyContains;
 import com.github.manevolent.jbot.platform.Platform;
 import com.github.manevolent.jbot.platform.PlatformManager;
 
+import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class PlatformCommand extends AnnotatedCommandExecutor {
     private final PlatformManager platformManager;
+    private final SearchHandler<com.github.manevolent.jbot.database.model.Platform> searchHandler;
 
-    public PlatformCommand(PlatformManager platformManager) {
+    public PlatformCommand(PlatformManager platformManager, Database database) {
         this.platformManager = platformManager;
+        this.searchHandler = database
+                .createSearchHandler(com.github.manevolent.jbot.database.model.Platform.class)
+                .string(new SearchHandlerPropertyContains("id"))
+                .build();
+    }
+
+    @Command(description = "Searches platforms", permission = "system.platform.search")
+    public void search(CommandSender sender,
+                       @CommandArgumentLabel.Argument(label = "search") String search,
+                       @CommandArgumentSearch.Argument Search query)
+            throws CommandExecutionException {
+        try {
+            sender.list(
+                    com.github.manevolent.jbot.database.model.Platform.class,
+                    searchHandler.search(query, 6),
+                    (sender1, platform) -> platform.getId() + " " +
+                            (platform.isConnected() ? "(connected)" : "(disconnected)")
+            ).send();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Command(description = "Connects a platform", permission = "system.platform.connect")

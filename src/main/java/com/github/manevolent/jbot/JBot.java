@@ -36,6 +36,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
+import org.eclipse.aether.repository.RemoteRepository;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -46,6 +47,7 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public final class JBot implements Bot, Runnable {
     private static final Version version = BuildInformation.getVersion() == null ?
@@ -195,6 +197,25 @@ public final class JBot implements Bot, Runnable {
         }
     }
 
+    private void recursivelyDisablePlugin(com.github.manevolent.jbot.plugin.Plugin plugin) {
+        // Only able to disable a plugin if its required dependencies are also *all* disabled.
+        Collection<com.github.manevolent.jbot.plugin.Plugin> blockingDependencies = plugin.getDependers().stream()
+                .filter(com.github.manevolent.jbot.plugin.Plugin::isEnabled)
+                .filter(depender -> depender.getRequiredDependencies().contains(plugin))
+                .collect(Collectors.toList());
+
+        for (com.github.manevolent.jbot.plugin.Plugin blockingDependency : blockingDependencies)
+            recursivelyDisablePlugin(blockingDependency);
+
+        try {
+            plugin.setEnabled(false);
+        } catch (Throwable e) {
+            Logger.getGlobal().log(Level.WARNING,
+                    "Problem disabling " + plugin.getArtifact().getIdentifier()
+                            + " during shutdown proceudre", e);
+        }
+    }
+
     @Override
     public void stop() throws IllegalAccessException {
         com.github.manevolent.jbot.security.Permission.checkPermission("system.stop");
@@ -207,15 +228,8 @@ public final class JBot implements Bot, Runnable {
             setState(BotState.STOPPING);
 
             try {
-                for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
-                    try {
-                        plugin.setEnabled(false);
-                    } catch (PluginException e) {
-                        Logger.getGlobal().log(Level.WARNING,
-                                "Problem disabling " + plugin.getArtifact().getIdentifier()
-                                        + " during shutdown proceudre", e);
-                    }
-                }
+                for (com.github.manevolent.jbot.plugin.Plugin plugin : pluginManager.getLoadedPlugins())
+                    recursivelyDisablePlugin(plugin);
             } finally {
                 setState(BotState.STOPPED);
                 Logger.getGlobal().info("Shutdown complete.");
@@ -287,12 +301,6 @@ public final class JBot implements Bot, Runnable {
 
             List<Option> optionList = new ArrayList<>();
 
-            optionList.add(new Option(
-                    'r', "repository", false, ".mvn", value -> bot.repository = new AetherArtifactRepository(
-                    Repositories.getRemoteRepositories(),
-                    new File(value)
-            ), "local maven repository path"));
-
 
             optionList.add(new Option(
                     'w', "waitOnStop", true, null, value -> bot.registerStateListener(botState -> {
@@ -327,6 +335,7 @@ public final class JBot implements Bot, Runnable {
                             model.registerEntity(PluginProperty.class);
                             model.registerEntity(UserBan.class);
                             model.registerEntity(Property.class);
+                            model.registerEntity(Repository.class);
 
                             return model.define();
                         });
@@ -338,6 +347,30 @@ public final class JBot implements Bot, Runnable {
                     throw new RuntimeException("Problem reading Hibernate configuration", ex);
                 }
             }, "Hibernate configuration file"));
+
+            optionList.add(new Option(
+                    'r', "repository", false, ".mvn", value -> {
+                List<RemoteRepository> repos = new ArrayList<>();
+
+                // Additional repositories take precedence
+                repos.addAll(bot.systemDatabase.execute(s -> {
+                    return new ArrayList<>(s.createQuery(
+                            "SELECT x FROM " + Repository.class.getName() + " x",
+                            Repository.class
+                    ).getResultList());
+                }).stream().map(repo ->
+                        new RemoteRepository.Builder(repo.getId(), repo.getType(), repo.getUrl())
+                                .build()).collect(Collectors.toList()
+                ));
+
+                // Default repositories
+                repos.addAll(Repositories.getRemoteRepositories());
+
+                bot.repository = new AetherArtifactRepository(
+                        repos,
+                        new File(value)
+                );
+            }, "local maven repository path"));
 
             Options options = new Options();
 
@@ -410,14 +443,16 @@ public final class JBot implements Bot, Runnable {
                     new RunasCommand(bot.userManager, bot.commandDispatcher)).alias("as");
             bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager)).alias("h");
             bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
-            bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager));
+            bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("version", new VersionCommand(bot)).alias("ver");
-            bot.commandManager.registerExecutor("platform", new PlatformCommand(bot.platformManager));
+            bot.commandManager.registerExecutor("platform",
+                    new PlatformCommand(bot.platformManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("chat", new ChatCommand(bot.platformManager));
             bot.commandManager.registerExecutor("conversation",
-                    new ConversationCommand(bot.conversationProvider)).alias("conv");
-            bot.commandManager.registerExecutor("user", new UserCommand(bot.platformManager, bot.userManager));
-            bot.commandManager.registerExecutor("group", new GroupCommand(bot.userManager));
+                    new ConversationCommand(bot.conversationProvider, bot.systemDatabase)).alias("conv");
+            bot.commandManager.registerExecutor("user",
+                    new UserCommand(bot.platformManager, bot.userManager, bot.systemDatabase));
+            bot.commandManager.registerExecutor("group", new GroupCommand(bot.userManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("ban", new BanCommand(bot.userManager));
             bot.commandManager.registerExecutor("unban", new UnbanCommand(bot.userManager));
             bot.commandManager.registerExecutor("permission",
@@ -425,7 +460,10 @@ public final class JBot implements Bot, Runnable {
             bot.commandManager.registerExecutor("runtime", new RuntimeCommand());
             bot.commandManager.registerExecutor("nickname", new NicknameCommand(bot.userManager)).alias("nick");
             bot.commandManager.registerExecutor("property",
-                    new PropertyCommand(bot.userManager,  bot.conversationProvider)).alias("prop");
+                    new PropertyCommand(bot.userManager, bot.conversationProvider)).alias("prop");
+            bot.commandManager.registerExecutor("repository", new RepositoryCommand(bot.systemDatabase)).alias("repo");
+
+            bot.start();
 
             // Console:
             Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
@@ -436,11 +474,11 @@ public final class JBot implements Bot, Runnable {
             user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
             consolePlatformRegistration.getConnection().connect();
 
-            bot.start();
-
             Logger.getGlobal().info("JBot started successfully.");
 
             bot.run();
+        } catch (Throwable e) {
+            Logger.getGlobal().log(Level.SEVERE, "Problem running application", e);
         } finally {
             System.exit(0);
         }

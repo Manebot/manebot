@@ -6,6 +6,7 @@ import com.github.manevolent.jbot.security.Permission;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 public final class DefaultPluginRegistration implements PluginRegistration {
     private final Bot bot;
@@ -63,7 +64,12 @@ public final class DefaultPluginRegistration implements PluginRegistration {
 
     @Override
     public Collection<PluginProperty> getProperties() {
-        return plugin.getProperties();
+        return plugin.getProperties().stream().map(x -> (PluginProperty) x).collect(Collectors.toList());
+    }
+
+    @Override
+    public void setVersion(String version) {
+        plugin.setVersion(version);
     }
 
     @Override
@@ -82,10 +88,11 @@ public final class DefaultPluginRegistration implements PluginRegistration {
     @Override
     public Plugin load() throws PluginLoadException {
         synchronized (loadLock) {
-            if (isLoaded()) throw new IllegalStateException("Plugin already loaded");
+            if (isLoaded()) return instance;
 
             try {
-                return instance = loader.call();
+                instance = loader.call();
+                return instance;
             } catch (PluginLoadException e) {
                 throw e;
             } catch (Exception e) {

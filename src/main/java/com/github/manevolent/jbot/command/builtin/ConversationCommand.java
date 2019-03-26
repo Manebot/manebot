@@ -7,17 +7,54 @@ import com.github.manevolent.jbot.command.executor.chained.AnnotatedCommandExecu
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentLabel;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentPage;
 import com.github.manevolent.jbot.command.executor.chained.argument.CommandArgumentString;
+import com.github.manevolent.jbot.command.search.CommandArgumentSearch;
 import com.github.manevolent.jbot.conversation.Conversation;
 import com.github.manevolent.jbot.conversation.ConversationProvider;
+import com.github.manevolent.jbot.database.Database;
+import com.github.manevolent.jbot.database.model.Group;
+import com.github.manevolent.jbot.database.model.Platform;
+import com.github.manevolent.jbot.database.search.Search;
+import com.github.manevolent.jbot.database.search.SearchHandler;
+import com.github.manevolent.jbot.database.search.SearchOperator;
+import com.github.manevolent.jbot.database.search.handler.ComparingSearchHandler;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyContains;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyEquals;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyIn;
 
+import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class ConversationCommand extends AnnotatedCommandExecutor {
     private final ConversationProvider conversationProvider;
+    private final SearchHandler<com.github.manevolent.jbot.database.model.Conversation> searchHandler;
 
-    public ConversationCommand(ConversationProvider conversationProvider) {
+    public ConversationCommand(ConversationProvider conversationProvider, Database database) {
         this.conversationProvider = conversationProvider;
+        this.searchHandler = database.createSearchHandler(com.github.manevolent.jbot.database.model.Conversation.class)
+                .string(new SearchHandlerPropertyContains("name"))
+                .argument("owner", new ComparingSearchHandler(
+                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("displayName")),
+                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("username")),
+                        SearchOperator.INCLUDE))
+                .argument("platform", new SearchHandlerPropertyEquals(root -> root.get("platform").get("id")))
+                .build();
+    }
+
+    @Command(description = "Searches conversations", permission = "system.conversation.search")
+    public void search(CommandSender sender,
+                       @CommandArgumentLabel.Argument(label = "search") String search,
+                       @CommandArgumentSearch.Argument Search query)
+            throws CommandExecutionException {
+        try {
+            sender.list(
+                    com.github.manevolent.jbot.database.model.Conversation.class,
+                    searchHandler.search(query, 6),
+                    (sender1, conversation) -> conversation.getId()
+            ).send();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Command(description = "Lists conversations", permission = "system.conversation.list")

@@ -1,6 +1,11 @@
 package com.github.manevolent.jbot.database.model;
 
 import com.github.manevolent.jbot.artifact.ArtifactIdentifier;
+import com.github.manevolent.jbot.database.search.SearchOperator;
+import com.github.manevolent.jbot.database.search.handler.ComparingSearchHandler;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyContains;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyEquals;
+import com.github.manevolent.jbot.database.search.handler.SearchHandlerPropertyIsNull;
 import com.github.manevolent.jbot.plugin.PluginProperty;
 import com.github.manevolent.jbot.plugin.PluginRegistration;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -46,7 +51,7 @@ public class Plugin extends TimedRow {
     @Column(length = 64, nullable = false)
     private String artifactId;
 
-    @Column(length = 32, nullable = false)
+    @Column(length = 128, nullable = false)
     private String version;
 
     @Column(nullable = false)
@@ -71,7 +76,14 @@ public class Plugin extends TimedRow {
     }
 
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        try {
+            this.enabled = database.executeTransaction(s -> {
+                Plugin plugin = s.find(Plugin.class, getPluginId());
+                return plugin.enabled = enabled;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -87,7 +99,18 @@ public class Plugin extends TimedRow {
         this.registration = registration;
     }
 
-    public Collection<PluginProperty> getProperties() {
+    public void setVersion(String version) {
+        try {
+            this.version = database.executeTransaction(s -> {
+                Plugin plugin = s.find(Plugin.class, getPluginId());
+                return plugin.version = version;
+            });
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Collection<com.github.manevolent.jbot.database.model.PluginProperty> getProperties() {
         return Collections.unmodifiableCollection(database.execute(s -> {
             return s.createQuery(
                     "SELECT x FROM " + com.github.manevolent.jbot.database.model.PluginProperty.class.getName()

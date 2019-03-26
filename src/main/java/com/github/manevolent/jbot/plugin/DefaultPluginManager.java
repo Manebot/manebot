@@ -4,20 +4,35 @@ import com.github.manevolent.jbot.JBot;
 import com.github.manevolent.jbot.artifact.*;
 import com.github.manevolent.jbot.command.CommandManager;
 import com.github.manevolent.jbot.database.DatabaseManager;
+import com.github.manevolent.jbot.database.model.PluginProperty;
 import com.github.manevolent.jbot.event.EventExecutionException;
 import com.github.manevolent.jbot.event.EventManager;
 import com.github.manevolent.jbot.event.plugin.PluginRegisteredEvent;
 import com.github.manevolent.jbot.platform.PlatformManager;
 import com.github.manevolent.jbot.plugin.java.JavaPluginLoader;
+import com.github.manevolent.jbot.plugin.loader.PluginLoader;
 import com.github.manevolent.jbot.plugin.loader.PluginLoaderRegistry;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public final class DefaultPluginManager implements PluginManager {
+    private static final Properties defaultPlugins = new Properties();
+    static {
+        try {
+            defaultPlugins.load(
+                    new InputStreamReader(JavaPluginLoader.class.getResourceAsStream("/default-plugins.properties"))
+            );
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private static final Class<com.github.manevolent.jbot.database.model.Plugin> pluginClass =
             com.github.manevolent.jbot.database.model.Plugin.class;
 
@@ -26,6 +41,8 @@ public final class DefaultPluginManager implements PluginManager {
 
     private final Set<Plugin> plugins = new HashSet<>();
     private final Map<ManifestIdentifier, PluginRegistration> pluginMap = new LinkedHashMap<>();
+    private final Map<PluginRegistration, com.github.manevolent.jbot.database.model.Plugin> modelMap
+            = new LinkedHashMap<>();
 
     private final Object installLock = new Object();
 
@@ -61,21 +78,38 @@ public final class DefaultPluginManager implements PluginManager {
 
     @Override
     public PluginRegistration getPlugin(ManifestIdentifier id) {
-        return pluginMap.get(id);
+        return getOrLoadRegistration(bot.getSystemDatabase().execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + pluginClass.getName() +" x " +
+                            "WHERE x.packageId = :packageId and x.artifactId = :artifactId",
+                    pluginClass
+            )
+                    .setParameter("packageId", id.getPackageId())
+                    .setParameter("artifactId", id.getArtifactId())
+                    .getResultList()
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        }));
     }
 
     private PluginRegistration getOrLoadRegistration(com.github.manevolent.jbot.database.model.Plugin plugin) {
+        if (plugin == null) return null;
+
         PluginRegistration registration = plugin.getRegistration();
 
         if (registration == null) {
-            plugin.setRegistration(registration = new DefaultPluginRegistration(
+            registration = new DefaultPluginRegistration(
                     bot,
                     plugin, this,
                     plugin.getArtifactIdentifier(),
                     () -> load(plugin.getArtifactIdentifier())
-            ));
+            );
+
+            plugin.setRegistration(registration);
 
             pluginMap.put(plugin.getArtifactIdentifier().withoutVersion(), registration);
+            modelMap.put(registration, plugin);
         }
 
         return registration;
@@ -90,11 +124,16 @@ public final class DefaultPluginManager implements PluginManager {
             throws PluginLoadException, FileNotFoundException {
         PluginRegistration registration = getPlugin(localArtifact.getIdentifier().withoutVersion());
         if (registration != null && registration.isLoaded())
-            throw new IllegalStateException(localArtifact.getIdentifier().withoutVersion() + " is already loaded.");
+            throw new IllegalStateException(
+                    localArtifact.getIdentifier().withoutVersion() +
+                    " is already registered and loaded."
+            );
 
         Plugin plugin = getLoaderRegistry().getLoader(localArtifact.getFile()).load(localArtifact);
 
-        plugins.add(plugin);
+        synchronized (installLock) {
+            plugins.add(plugin);
+        }
 
         try {
             bot.getEventDispatcher().execute(new PluginRegisteredEvent(this, plugin));
@@ -124,8 +163,19 @@ public final class DefaultPluginManager implements PluginManager {
     }
 
     @Override
+    public Collection<ArtifactDependency> getDependencies(ArtifactIdentifier artifactIdentifier)
+            throws ArtifactRepositoryException {
+        Artifact artifact = getRepostiory().getArtifact(artifactIdentifier);
+        PluginLoader loader = getLoaderRegistry().getLoader(artifact.getExtension());
+        return loader.getDependencies(artifact);
+    }
+
+    @Override
     public PluginRegistration install(ArtifactIdentifier artifactIdentifier)
             throws IllegalArgumentException, PluginLoadException {
+        if (isInstalled(artifactIdentifier))
+            throw new IllegalArgumentException("Plugin is already installed: " + artifactIdentifier);
+
         com.github.manevolent.jbot.database.model.Plugin plugin;
 
         synchronized (installLock) {
@@ -137,6 +187,7 @@ public final class DefaultPluginManager implements PluginManager {
                 )
                         .setParameter("packageId", artifactIdentifier.getPackageId())
                         .setParameter("artifactId", artifactIdentifier.getArtifactId())
+                        .setMaxResults(1)
                         .getResultList()
                         .stream()
                         .findFirst()
@@ -147,7 +198,8 @@ public final class DefaultPluginManager implements PluginManager {
                 final PluginRegistration registration =
                         new DefaultPluginRegistration(
                                 bot,
-                                plugin, this,
+                                null,
+                                this,
                                 artifactIdentifier,
                                 () -> load(artifactIdentifier)
                         );
@@ -191,11 +243,60 @@ public final class DefaultPluginManager implements PluginManager {
 
     @Override
     public boolean uninstall(PluginRegistration pluginRegistration) {
-        throw new UnsupportedOperationException();
+        com.github.manevolent.jbot.database.model.Plugin plugin = modelMap.get(pluginRegistration);
+        if (plugin == null) return false;
+
+        synchronized (installLock) {
+            Collection<PluginProperty> properties = plugin.getProperties();
+
+            try {
+                bot.getSystemDatabase().executeTransaction(s -> {
+                    for (PluginProperty property : properties) s.remove(property);
+                    s.remove(plugin);
+                });
+
+                if (pluginRegistration.isLoaded()) plugins.remove(pluginRegistration.getInstance());
+                modelMap.remove(pluginRegistration);
+                pluginMap.remove(pluginRegistration.getIdentifier().withoutVersion());
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean isInstalled(ArtifactIdentifier artifactIdentifier) {
+        return bot.getSystemDatabase().execute(s -> {
+            return s.createQuery(
+                    "SELECT x FROM " + pluginClass.getName() + " x " +
+                            "WHERE x.packageId = :packageId and x.artifactId = :artifactId and x.version = :version",
+                    pluginClass
+            )
+                    .setParameter("packageId", artifactIdentifier.getPackageId())
+                    .setParameter("artifactId", artifactIdentifier.getArtifactId())
+                    .setParameter("version", artifactIdentifier.getVersion())
+                    .setMaxResults(1)
+                    .getResultList()
+                    .stream()
+                    .findAny();
+        }).isPresent();
     }
 
     @Override
     public ArtifactIdentifier resolveIdentifier(String identifier) {
+        if (defaultPlugins.containsKey(identifier.toLowerCase()))
+            try {
+                ManifestIdentifier manifestIdentifier = ManifestIdentifier.fromString(
+                        defaultPlugins.getProperty(identifier)
+                );
+
+                return getRepostiory().getManifest(manifestIdentifier).getLatestVersion();
+            } catch (ArtifactRepositoryException ex3) {
+                throw new IllegalArgumentException("Problem resolving identifier", ex3);
+            }
+
         try {
             return ArtifactIdentifier.fromString(identifier);
         } catch (IllegalArgumentException ex) {

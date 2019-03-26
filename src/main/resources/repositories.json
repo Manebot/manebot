@@ -1,8 +1,8 @@
 [
   {
-    "id": "jitpack",
+    "id": "teamlixo",
     "type": "default",
-    "url": "http://jitpack.io/"
+    "url": "http://maven.teamlixo.net/repository/public/"
   },
   {
     "id": "central",

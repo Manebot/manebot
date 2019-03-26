@@ -1,30 +1,48 @@
-image: maven:latest
+image: maven
+
+variables:
+  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+  MAVEN_OPTS: "-Dhttps.protocols=TLSv1.1,TLSv1.2 -Dmaven.repo.local=.m2/repository"
+
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
-  - mvn/
-  - /root/.m2/
-  
-before_script:
-  # Install JFrog CLI
-  -  curl -fL https://getcli.jfrog.io | sh
-  # Configure Artifactory instance with JFrog CLI
-  - ./jfrog rt config --url=$ARTIFACTORY_URL --user=$ARTIFACTORY_USER --password=$ARTIFACTORY_PASS
-  - ./jfrog rt c show
-  # Set the M2_HOME environment variable
-  - export M2_HOME=/usr/share/maven
-  # Replace the repository name in the configuration.yml to the correct one.
-  - sed -i 's,MAVEN_SNAPSHOT_REPO_KEY,'"$MAVEN_SNAPSHOT_REPO_KEY"',g' configuration.yml
-  - sed -i 's,MAVEN_RELEASE_REPO_KEY,'"$MAVEN_RELEASE_REPO_KEY"',g' configuration.yml
-build:
+    - .m2/repository/
+    - target/
+    
+stages:
+  - build
+  - test
+  - package 
+  - deploy
+
+codebuild:
   tags:
     - maven
+  stage: build
+  script: 
+    - mvn compile
+
+codetest:
+  tags:
+    - maven
+  stage: test
   script:
-    # Run the MVN command
-    - ./jfrog rt mvn "clean install" configuration.yml --build-name=gitlabci-maven-artifactory --build-number=$CI_JOB_ID
-    # Collect the environment variables
-    - ./jfrog rt bce gitlabci-maven-artifactory $CI_JOB_ID
-    # Pass the build information to Artifactory
-    - ./jfrog rt bp gitlabci-maven-artifactory $CI_JOB_ID
-  only:
-    - test
+    - mvn $MAVEN_CLI_OPTS test
+
+codepackage:
+  tags:
+    - maven
+  stage: package
+  script:
+    - mvn $MAVEN_CLI_OPTS package -Dmaven.test.skip=true
+  artifacts:
+    paths:
+      - target/*.war 
+
+codedeploy:
+  tags:
+    - maven
+  stage: deploy
+  script:
+    - mvn $MAVEN_CLI_OPTS deploy -Dmaven.test.skip=true

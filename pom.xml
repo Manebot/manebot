@@ -6,17 +6,39 @@
 
     <groupId>com.github.manevolent.jbot</groupId>
     <artifactId>jbot</artifactId>
-    <version>0.1</version>
+    <version>0.1-SNAPSHOT</version>
 
     <repositories>
         <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>public</id>
+            <name>Team Lixo public release repository</name>
+            <url>https://maven.teamlixo.net/repository/public/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
         </repository>
     </repositories>
 
+    <distributionManagement>
+        <repository>
+            <id>public-releases</id>
+            <name>Team Lixo public release repository</name>
+            <url>https://maven.teamlixo.net/repository/public-releases/</url>
+            <uniqueVersion>true</uniqueVersion>
+        </repository>
+        <snapshotRepository>
+            <id>public-snapshots</id>
+            <name>Team Lixo public release snapshots</name>
+            <url>https://maven.teamlixo.net/repository/public-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+
     <properties>
-        <apiVersion>0.1.6</apiVersion>
+        <apiVersion>0.1.6-SNAPSHOT</apiVersion>
 
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
@@ -76,7 +98,7 @@
         <dependency>
             <groupId>com.github.manevolent</groupId>
             <artifactId>jbot-core</artifactId>
-            <version>290efc6603c82399bf62369060f5b9310d1a799d</version>
+            <version>${apiVersion}</version>
         </dependency>
 
         <dependency>

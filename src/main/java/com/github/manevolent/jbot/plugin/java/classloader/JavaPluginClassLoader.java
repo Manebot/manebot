@@ -2,9 +2,8 @@ package com.github.manevolent.jbot.plugin.java.classloader;
 
 import com.github.manevolent.jbot.plugin.java.JavaPluginDependency;
 import com.github.manevolent.jbot.plugin.java.JavaPluginInstance;
-import sun.misc.IOUtils;
-import sun.misc.Resource;
-import sun.misc.URLClassPath;
+
+import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,7 +12,6 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * The main class loader for JavaPlugin instances.
@@ -94,16 +92,25 @@ public final class JavaPluginClassLoader extends ClassLoader implements LocalCla
          * Gets resources from the kernel or plugin class loader
          * @param name Resource name to search
          * @return Resources
+         * @noinspection unchecked
          */
         @Override
         public Enumeration<URL> getResources(String name) {
-            Enumeration<Resource> bootstrapResources = sun.misc.Launcher.getBootstrapClassPath().getResources(name);
+            /*Enumeration<Resource> bootstrapResources = sun.misc.Launcher.getBootstrapClassPath().getResources(name);
             Enumeration<URL> bootstrapUrls =
                     Collections.enumeration(
                             Collections.list(bootstrapResources).stream()
                                     .map(Resource::getURL)
                                     .collect(Collectors.toList())
-                    );
+                    );*/
+
+            Enumeration<URL> bootstrapUrls = Collections.emptyEnumeration();
+
+            try {
+                bootstrapUrls = ClassLoader.getSystemClassLoader().getParent().getResources(name);
+            } catch (IOException e) {
+                // Ignore
+            }
 
             return Utils.concat(
                     bootstrapUrls,
@@ -119,9 +126,8 @@ public final class JavaPluginClassLoader extends ClassLoader implements LocalCla
          */
         @Override
         public URL getResource(String name) {
-            URLClassPath ucp = sun.misc.Launcher.getBootstrapClassPath();
-            Resource res = ucp.getResource(name);
-            if (res != null && res.getURL() != null) return res.getURL();
+            URL bootstrapResource = ClassLoader.getSystemClassLoader().getParent().getResource(name);
+            if (bootstrapResource != null) return bootstrapResource;
 
             URL url = getLocalResource(name);
             if (url != null) return url;
@@ -279,7 +285,7 @@ public final class JavaPluginClassLoader extends ClassLoader implements LocalCla
             // Load class bytes into local system.
             byte[] bytes;
             try {
-                bytes = IOUtils.readFully(inputStream, -1, true);
+                bytes = IOUtils.toByteArray(inputStream);
             } catch (IOException e) {
                 throw new ClassNotFoundException(name, e);
             } finally {

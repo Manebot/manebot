@@ -25,5 +25,7 @@ build:
     - ./jfrog rt bce gitlabci-maven-artifactory $CI_JOB_ID
     # Pass the build information to Artifactory
     - ./jfrog rt bp gitlabci-maven-artifactory $CI_JOB_ID
+    - ls -al .
+    - ls -al /usr/share/maven
   only:
     - test

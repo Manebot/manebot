@@ -3,6 +3,7 @@ cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
   - mvn/
+  - /root/.m2/
   
 before_script:
   # Install JFrog CLI

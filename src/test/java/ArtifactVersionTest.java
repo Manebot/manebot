@@ -1,5 +1,5 @@
 
-import com.github.manevolent.jbot.artifact.aether.AetherArtifactRepository;
+import io.manebot.artifact.aether.AetherArtifactRepository;
 import junit.framework.TestCase;
 import org.eclipse.aether.repository.RemoteRepository;
 

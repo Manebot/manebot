@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.manevolent.jbot</groupId>
-    <artifactId>jbot</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <groupId>io.manebot</groupId>
+    <artifactId>manebot</artifactId>
+    <version>0.1.2</version>
 
     <repositories>
         <repository>
@@ -38,7 +38,7 @@
     </distributionManagement>
 
     <properties>
-        <apiVersion>0.1.6-SNAPSHOT</apiVersion>
+        <apiVersion>0.1.6.1</apiVersion>
 
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
@@ -83,7 +83,7 @@
                         <index>true</index>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.github.manevolent.jbot.JBot</mainClass>
+                            <mainClass>io.manebot.DefaultBot</mainClass>
                         </manifest>
                         <manifestEntries>
                             <Implementation-Build>$\{buildNumber}</Implementation-Build>
@@ -96,8 +96,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.github.manevolent</groupId>
-            <artifactId>jbot-core</artifactId>
+            <groupId>io.manebot</groupId>
+            <artifactId>manebot-core</artifactId>
             <version>${apiVersion}</version>
         </dependency>
 

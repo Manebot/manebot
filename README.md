@@ -22,6 +22,10 @@ You can avoid tracking multiple code-streams for each of your bot's platforms, a
 
 Since Manebot is open-source, anyone can make a plugin for Manebot. As part of the project, Manebot has some officially developed plugins that are also open-source.
 
+#### Plugin dependency
+
+Plugins can extend other plugins, adding to the depender's feature set and reducing code duplication. For example, the **discord** plugin depends on **audio** to provide music bot capabilites in the platform it in turn provides, and **audio** depends on **media** to support media transcoding, among other neat stuff. Depending a plugin is easy-peasy: since Manebot uses **Maven** as its engine for dependency graph building, all you have to do is add a plugin as a *provided* dependency in your Maven project. Manebot will automatically associate these as required dependencies, and handle the rest for you.
+
 ## Platforms
 
 Manebot considers a **platform** as a online communication service such as Discord, Skype, Teamspeak, and so forth. Manebot is platform-agnostic; this means that it can support many platforms at once, providing as many features of Manebot to those platforms as possible. Adding a specific platform to Manebot is as simple as:

@@ -1,6 +1,7 @@
 package io.manebot.command.builtin;
 
 import io.manebot.chat.Chat;
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -14,6 +15,7 @@ import io.manebot.platform.PlatformUser;
 import io.manebot.user.User;
 
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.stream.Collectors;
 
 public class ChatCommand extends AnnotatedCommandExecutor {
@@ -43,8 +45,9 @@ public class ChatCommand extends AnnotatedCommandExecutor {
                         .sorted(Comparator.comparing(Chat::getId))
                         .collect(Collectors.toList()))
                         .page(page)
-                        .responder((sender1, chat1) -> chat1.getId() + " " +
-                                (chat1.isConnected() ? "(connected)" : "(disconnected)"))
+                        .responder((textBuilder, chat1) ->
+                                textBuilder.append(chat1.getId(), EnumSet.of(TextStyle.BOLD))
+                                        .append(" " + (chat1.isConnected() ? "(connected)" : "(disconnected)")))
                         .build()
         ).send();
     }

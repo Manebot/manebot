@@ -471,6 +471,7 @@ public final class DefaultBot implements Bot, Runnable {
             bot.chatDispatcher = new DefaultChatDispatcher(bot);
 
             // Builtin commands:
+            bot.commandManager.registerExecutor("ping", new PingCommand());
             bot.commandManager.registerExecutor("runas",
                     new RunasCommand(bot.userManager, bot.commandDispatcher)).alias("as");
             bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager)).alias("h");

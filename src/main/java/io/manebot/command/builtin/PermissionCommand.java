@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -19,6 +20,7 @@ import io.manebot.user.UserGroup;
 import io.manebot.user.UserManager;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.function.Function;
 
 public class PermissionCommand extends AnnotatedCommandExecutor {
@@ -51,10 +53,12 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
                 builder -> builder
                         .direct(new ArrayList<>(entity.getPermissions()))
                         .page(page)
-                        .responder((sender1, permission) ->
-                                permission.getGrant().name().toLowerCase() + " " + permission.getPermission().toString()
-                                        + " (granted by " + permission.getGranter().getDisplayName() +
+                        .responder((textBuilder, permission) ->
+                                textBuilder.append(permission.getGrant().name().toLowerCase()).append(" ")
+                                        .append(permission.getPermission().toString(), EnumSet.of(TextStyle.BOLD))
+                                        .append(" (granted by " + permission.getGranter().getDisplayName() +
                                         " on " + permission.getDate() + ")")
+                        )
                         .build()
         ).send();
     }

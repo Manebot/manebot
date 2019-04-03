@@ -38,7 +38,7 @@
     </distributionManagement>
 
     <properties>
-        <apiVersion>0.1.6.1</apiVersion>
+        <apiVersion>0.1.6.2-SNAPSHOT</apiVersion>
 
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>

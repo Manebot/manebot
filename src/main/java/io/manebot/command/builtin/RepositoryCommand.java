@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -18,6 +19,7 @@ import java.net.URI;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 
 public class RepositoryCommand extends AnnotatedCommandExecutor {
     private final Database database;
@@ -96,7 +98,10 @@ public class RepositoryCommand extends AnnotatedCommandExecutor {
                 builder -> builder
                         .direct(new ArrayList<>(repo))
                         .page(page)
-                        .responder((sender1, repo1) -> repo1.getId() + ": " + repo1.getUrl())
+                        .responder((textBuilder, repo1) -> textBuilder
+                                .append(repo1.getId(), EnumSet.of(TextStyle.BOLD))
+                                .append(": ")
+                                .append(repo1.getUrl()))
                         .build()
         ).send();
     }

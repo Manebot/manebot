@@ -11,8 +11,6 @@ import io.manebot.user.UserManager;
 public class NicknameCommand extends AnnotatedCommandExecutor {
     private final UserManager userManager;
 
-    private static final long mb = 1024*1024;
-
     public NicknameCommand(UserManager userManager) {
         this.userManager = userManager;
     }

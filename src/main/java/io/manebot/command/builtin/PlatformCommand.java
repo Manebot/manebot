@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -7,6 +8,7 @@ import io.manebot.command.executor.chained.AnnotatedCommandExecutor;
 import io.manebot.command.executor.chained.argument.CommandArgumentLabel;
 import io.manebot.command.executor.chained.argument.CommandArgumentPage;
 import io.manebot.command.executor.chained.argument.CommandArgumentString;
+import io.manebot.command.response.CommandListResponse;
 import io.manebot.command.search.CommandArgumentSearch;
 import io.manebot.database.Database;
 import io.manebot.database.model.Plugin;
@@ -19,11 +21,30 @@ import io.manebot.plugin.PluginException;
 
 import java.sql.SQLException;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.stream.Collectors;
 
 public class PlatformCommand extends AnnotatedCommandExecutor {
     private final PlatformManager platformManager;
     private final SearchHandler<io.manebot.database.model.Platform> searchHandler;
+
+    private final CommandListResponse.ListElementFormatter<io.manebot.database.model.Platform> modelFormatter =
+            (textBuilder, platform) ->
+            textBuilder.append(platform.getId(), EnumSet.of(TextStyle.BOLD))
+                    .append(" ")
+                    .append(
+                            platform.isConnected() ? "(connected)" : "(disconnected)",
+                            EnumSet.of(TextStyle.ITALICS)
+                    );
+
+    private final CommandListResponse.ListElementFormatter<Platform> abstractFormatter =
+            (textBuilder, platform) ->
+                    textBuilder.append(platform.getId(), EnumSet.of(TextStyle.BOLD))
+                            .append(" ")
+                            .append(
+                                    platform.isConnected() ? "(connected)" : "(disconnected)",
+                                    EnumSet.of(TextStyle.ITALICS)
+                            );
 
     public PlatformCommand(PlatformManager platformManager, Database database) {
         this.platformManager = platformManager;
@@ -42,8 +63,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
             sender.list(
                     io.manebot.database.model.Platform.class,
                     searchHandler.search(query, 6),
-                    (sender1, platform) -> platform.getId() + " " +
-                            (platform.isConnected() ? "(connected)" : "(disconnected)")
+                    modelFormatter
             ).send();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -122,8 +142,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                                 .sorted(Comparator.comparing(Platform::getId))
                                 .collect(Collectors.toList()))
                         .page(page)
-                        .responder((sender1, platform) -> platform.getId() + " " +
-                                (platform.isConnected() ? "(connected)" : "(disconnected)"))
+                        .responder(abstractFormatter)
                         .build()
         ).send();
     }

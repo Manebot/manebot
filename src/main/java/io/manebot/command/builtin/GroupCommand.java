@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -22,6 +23,7 @@ import io.manebot.user.UserManager;
 import javax.persistence.criteria.*;
 import java.sql.SQLException;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -59,8 +61,10 @@ public class GroupCommand extends AnnotatedCommandExecutor {
             sender.list(
                     io.manebot.database.model.Group.class,
                     searchHandler.search(query, 6),
-                    (sender1, group) -> group.getName() + " (" + group.getUsers().size() +
-                            " users, owned by " + group.getOwner().getDisplayName() + ")"
+                    (textBuilder, group) ->
+                            textBuilder.append(group.getName(), EnumSet.of(TextStyle.BOLD))
+                            .append(" (" + group.getUsers().size() + " users, owned by " +
+                            group.getOwner().getDisplayName() + ")")
             ).send();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -80,8 +84,10 @@ public class GroupCommand extends AnnotatedCommandExecutor {
                                 .sorted(Comparator.comparing(UserGroup::getName))
                                 .collect(Collectors.toList()))
                         .page(page)
-                        .responder((sender1, group) -> group.getName() + " (" + group.getUsers().size() +
-                                " users, owned by " + group.getOwner().getDisplayName() + ")")
+                        .responder((textBuilder, group) ->
+                                textBuilder.append(group.getName(), EnumSet.of(TextStyle.BOLD))
+                                .append(" (" + group.getUsers().size() +
+                                " users, owned by " + group.getOwner().getDisplayName() + ")"))
                         .build()
         ).send();
     }

@@ -5,6 +5,7 @@ import io.manebot.artifact.ArtifactDependency;
 import io.manebot.artifact.ArtifactIdentifier;
 import io.manebot.artifact.ArtifactRepositoryException;
 import io.manebot.artifact.ManifestIdentifier;
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -54,8 +55,11 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             sender.list(
                     io.manebot.database.model.Plugin.class,
                     searchHandler.search(query, 6),
-                    (sender1, plugin) -> plugin.getArtifactIdentifier().getArtifactId()
-                            + " (" + plugin.getArtifactIdentifier() + ")"
+                    (textBuilder, plugin) ->
+                            textBuilder.append(
+                                    plugin.getArtifactIdentifier().getArtifactId(),
+                                    EnumSet.of(TextStyle.BOLD)
+                            ).append(" (" + plugin.getArtifactIdentifier() + ")")
             ).send();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -73,7 +77,9 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                         .sorted(Comparator.comparing(Plugin::getName))
                         .collect(Collectors.toList()))
                 .page(page)
-                .responder((sender1, plugin) -> plugin.getName() + " (" + plugin.getArtifact().getIdentifier() + ")")
+                .responder((textBuilder, plugin) ->
+                        textBuilder.append(plugin.getName(), EnumSet.of(TextStyle.BOLD))
+                                .append(" (" + plugin.getArtifact().getIdentifier() + ")"))
                 .build()
         ).send();
     }

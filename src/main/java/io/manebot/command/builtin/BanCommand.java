@@ -51,15 +51,16 @@ public class BanCommand extends AnnotatedCommandExecutor {
         sender.list(
                 UserBan.class,
                 builder -> builder.direct(new ArrayList<>(user.getBans())).page(page)
-                        .responder((chatSender, userBan) -> {
+                        .responder((textBuilder, userBan) -> {
                             String pardoned = userBan.isPardoned() ? " (pardoned)" : "";
                             if (userBan.getReason() != null)
-                                return "until " + userBan.getEnd() +
+                                textBuilder.append("until " + userBan.getEnd() +
                                         " - \"" + userBan.getReason() + "\" (issued " + userBan.getDate() + " by "
-                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned;
+                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
                             else
-                                return "until " + userBan.getEnd() + " (issued " + userBan.getDate() + " by "
-                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned;
+                                textBuilder.append("until " + userBan.getEnd() +
+                                        " (issued " + userBan.getDate() + " by "
+                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
                         }).build()
         ).send();
     }
@@ -72,16 +73,16 @@ public class BanCommand extends AnnotatedCommandExecutor {
         sender.list(
                 UserBan.class,
                 builder -> builder.direct(new ArrayList<>(userManager.getBans())).page(page)
-                        .responder((chatSender, userBan) -> {
+                        .responder((textBuilder, userBan) -> {
                             String pardoned = userBan.isPardoned() ? " (pardoned)" : "";
                             if (userBan.getReason() != null)
-                                return userBan.getUser().getDisplayName() + ": until " + userBan.getEnd() +
+                                textBuilder.append(userBan.getUser().getDisplayName() + ": until " + userBan.getEnd() +
                                         " - \"" + userBan.getReason() + "\" (issued " + userBan.getDate() + " by "
-                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned;
+                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
                             else
-                                return userBan.getUser().getDisplayName() + ": until " + userBan.getEnd() +
+                                textBuilder.append(userBan.getUser().getDisplayName() + ": until " + userBan.getEnd() +
                                         " (issued " + userBan.getDate() + " by "
-                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned;
+                                        + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
                         }).build()
         ).send();
     }

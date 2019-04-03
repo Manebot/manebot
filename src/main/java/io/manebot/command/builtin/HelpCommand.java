@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandManager;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
@@ -34,9 +35,11 @@ public class HelpCommand extends AnnotatedCommandExecutor {
                 CommandManager.Registration.class,
                 builder -> builder.direct(registrations)
                         .page(page)
-                        .responder((commandSender, registration) ->
-                                registration.getLabel() + ": " + registration.getExecutor().getDescription())
-                        .build()
+                        .responder((textBuilder, registration) ->
+                                textBuilder.append(registration.getLabel(), EnumSet.of(TextStyle.BOLD))
+                                        .append(": ")
+                                        .append(registration.getExecutor().getDescription())
+                        ).build()
         ).send();
     }
 
@@ -75,7 +78,9 @@ public class HelpCommand extends AnnotatedCommandExecutor {
                 String.class,
                 stringBuilder -> stringBuilder.direct(helpLines)
                         .page(finalPageNumber)
-                        .responder((sender1, line) -> subCommandLabel + " " + line)
+                        .responder((textBuilder, line) ->
+                                textBuilder.append(subCommandLabel, EnumSet.of(TextStyle.BOLD)).append(" ").append(line)
+                        )
                         .build()
         ).send();
     }

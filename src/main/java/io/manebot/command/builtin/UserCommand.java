@@ -1,5 +1,6 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
@@ -23,6 +24,7 @@ import javax.persistence.criteria.Root;
 import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -173,7 +175,10 @@ public class UserCommand extends AnnotatedCommandExecutor {
                                 ).thenComparing(UserAssociation::getPlatformId))
                         .collect(Collectors.toList()))
                 .page(page)
-                .responder((sender1, assoc) -> assoc.getPlatform().getId() + ":" + assoc.getPlatformId())
+                .responder((textBuilder, assoc) ->
+                        textBuilder.append(assoc.getPlatform().getId(), EnumSet.of(TextStyle.BOLD))
+                                .append(": ")
+                                .append(assoc.getPlatformId()))
                 .build()
         ).send();
     }

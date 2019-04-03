@@ -8,7 +8,7 @@ public class PingCommand extends AnnotatedCommandExecutor {
 
     @Command(description = "Pings the system")
     public void ping(CommandSender sender) {
-
+        sender.sendMessage("Ping reply.");
     }
 
     @Override

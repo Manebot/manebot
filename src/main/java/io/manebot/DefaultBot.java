@@ -306,6 +306,12 @@ public final class DefaultBot implements Bot, Runnable {
             handler.setLevel(Level.ALL);
             logger.addHandler(handler);
 
+            Properties systemProperties = new Properties();
+            System.getenv().forEach(systemProperties::setProperty);
+            System.getProperties().forEach(
+                    (key,value) -> systemProperties.setProperty(key.toString(),value.toString())
+            );
+
             logger.info("Starting manebot...");
 
             List<RemoteRepository> repos = new ArrayList<>();
@@ -315,19 +321,12 @@ public final class DefaultBot implements Bot, Runnable {
 
             List<Option> optionList = new ArrayList<>();
             optionList.add(new Option(
-                    'w', "waitOnStop", true, null, value -> bot.registerStateListener(botState -> {
-                switch (botState) {
-                    case STOPPED:
-                        System.exit(0);
-                        break;
-                }
-            }), "wait when bot is stopped"));
-
-            optionList.add(new Option(
                     'h', "hibernateConfiguration", false, "hibernate.properties", value -> {
                 try (LogTimer section_configuring = new LogTimer("Configuring database")) {
                     Properties properties = new Properties();
-                    properties.load(new FileReader(new File(value)));
+                    File file = new File(value);
+                    if (file.exists()) properties.load(new FileReader(file));
+                    else properties = systemProperties;
 
                     try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
                         bot.databaseManager = new HibernateManager(bot, properties);
@@ -387,7 +386,6 @@ public final class DefaultBot implements Bot, Runnable {
                 ));
 
                 // Default repositories
-
                 bot.repository = new AetherArtifactRepository(
                         repos,
                         new File(value)

@@ -109,6 +109,7 @@ public class HibernateManager implements DatabaseManager {
             this.properties.setProperty(property, properties.getProperty(property));
 
         this.properties.setProperty("hibernate.enable_lazy_load_no_trans", "true");
+        this.properties.setProperty("hibernate.globally_quoted_identifiers", "true");
     }
 
     public Collection<Class<?>> getEntities() {

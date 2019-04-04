@@ -47,6 +47,8 @@
     </properties>
 
     <build>
+        <finalName>manebot</finalName>
+
         <resources>
             <resource>
                 <directory>src/main/resources</directory>

@@ -92,11 +92,6 @@ public class ConsolePlatformConnection implements PlatformConnection {
     }
 
     @Override
-    public UserRegistration getUserRegistration() {
-        return bot.getDefaultUserRegistration();
-    }
-
-    @Override
     public PlatformUser getSelf() {
         return consoleUser;
     }
@@ -147,6 +142,11 @@ public class ConsolePlatformConnection implements PlatformConnection {
         public Collection<Chat> getChats() {
             return Collections.singletonList(consoleChat);
         }
+
+        @Override
+        public Chat getPrivateChat() {
+            return consoleChat;
+        }
     }
 
     private class ConsoleChat implements Chat {
@@ -163,6 +163,21 @@ public class ConsolePlatformConnection implements PlatformConnection {
         @Override
         public void setName(String s) throws UnsupportedOperationException {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Collection<ChatMessage> sendMessage(Consumer<ChatMessage.Builder> consumer) {
+            BasicTextChatMessage.Builder builder = new BasicTextChatMessage.Builder(consoleUser, consoleChat) {
+                @Override
+                public BasicTextChatMessage build() {
+                    System.out.println(getMessage());
+                    return super.build();
+                }
+            };
+
+            consumer.accept(builder);
+
+            return Collections.singletonList(builder.build());
         }
 
         @Override
@@ -196,18 +211,8 @@ public class ConsolePlatformConnection implements PlatformConnection {
         }
 
         @Override
-        public ChatMessage sendMessage(Consumer<ChatMessage.Builder> consumer) {
-            BasicTextChatMessage.Builder builder = new BasicTextChatMessage.Builder(consoleUser, consoleChat) {
-                @Override
-                public BasicTextChatMessage build() {
-                    System.out.println(getMessage());
-                    return super.build();
-                }
-            };
-
-            consumer.accept(builder);
-
-            return builder.build();
+        public boolean canSendEmbeds() {
+            return false;
         }
 
         @Override
@@ -223,6 +228,11 @@ public class ConsolePlatformConnection implements PlatformConnection {
         @Override
         public boolean isTyping() {
             return false;
+        }
+
+        @Override
+        public TextFormat getFormat() {
+            return TextFormat.BASIC;
         }
 
         @Override

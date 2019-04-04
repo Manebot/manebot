@@ -2,6 +2,7 @@ package io.manebot.command.builtin;
 
 import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
+import io.manebot.command.exception.CommandAccessException;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.command.executor.chained.AnnotatedCommandExecutor;
@@ -54,6 +55,44 @@ public class UserCommand extends AnnotatedCommandExecutor {
                         new SearchHandlerPropertyEquals(root -> root.get("group").get("name"))
                 ))
                 .build();
+    }
+
+    @Command(description = "Changes a user's type", permission = "system.user.type.set")
+    public void setType(CommandSender sender,
+                       @CommandArgumentLabel.Argument(label = "type") String typeLabel,
+                        @CommandArgumentLabel.Argument(label = "set") String setLabel,
+                        @CommandArgumentString.Argument(label = "username") String displayName,
+                        @CommandArgumentSwitch.Argument(labels = {"admin","standard","anonymous"}) String type)
+            throws CommandExecutionException {
+        if (sender.getUser().getType() != UserType.SYSTEM)
+            throw new CommandAccessException("Only system users can change another user's type.");
+
+        User user = userManager.getUserByDisplayName(displayName);
+        if (user == null)
+            throw new CommandArgumentException("User not found.");
+
+        if (user == sender.getUser())
+            throw new CommandAccessException("Cannot change your own user's type.");
+
+        UserType userType;
+
+        switch (type) {
+            case "admin":
+                userType = UserType.SYSTEM;
+                break;
+            case "standard":
+                userType = UserType.COMMON;
+                break;
+            case "anonymous":
+                userType = UserType.ANONYMOUS;
+                break;
+            default:
+                throw new CommandArgumentException("Unrecognized user type");
+        }
+
+        user.setType(userType);
+
+        sender.sendMessage("User type has been updated.");
     }
 
     @Command(description = "Searches users", permission = "system.user.search")
@@ -212,19 +251,14 @@ public class UserCommand extends AnnotatedCommandExecutor {
     public void removeConnection(CommandSender sender,
                                  @CommandArgumentLabel.Argument(label = "connection") String connection,
                                  @CommandArgumentLabel.Argument(label = "remove") String create,
-                                 @CommandArgumentString.Argument(label = "display name") String displayName,
                                  @CommandArgumentString.Argument(label = "platform") String platformId,
                                  @CommandArgumentString.Argument(label = "id") String userId)
             throws CommandExecutionException {
-        User user = userManager.getUserByDisplayName(displayName);
-        if (user == null)
-            throw new CommandArgumentException("User not found.");
-
         Platform platform = platformManager.getPlatformById(platformId);
         if (platform == null)
             throw new CommandArgumentException("Platform not found.");
 
-        UserAssociation association = user.getUserAssociation(platform, userId);
+        UserAssociation association = platform.getUserAssocation(userId);
         if (association == null)
             throw new CommandArgumentException("This association doesn't exist.");
         else if (association == sender.getPlatformUser().getAssociation())

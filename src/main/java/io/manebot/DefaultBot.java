@@ -3,10 +3,11 @@ package io.manebot;
 import io.manebot.artifact.ArtifactRepository;
 import io.manebot.artifact.Repositories;
 import io.manebot.artifact.aether.AetherArtifactRepository;
-import io.manebot.chat.ChatDispatcher;
-import io.manebot.chat.DefaultChatDispatcher;
+import io.manebot.chat.*;
 import io.manebot.command.*;
 import io.manebot.command.builtin.*;
+import io.manebot.command.exception.CommandArgumentException;
+import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.conversation.ConversationProvider;
 import io.manebot.conversation.DefaultConversationProvider;
 import io.manebot.database.DatabaseManager;
@@ -18,6 +19,9 @@ import io.manebot.database.model.UserBan;
 import io.manebot.database.model.UserGroup;
 import io.manebot.event.DefaultEventManager;
 import io.manebot.event.EventDispatcher;
+import io.manebot.event.EventHandler;
+import io.manebot.event.EventListener;
+import io.manebot.event.chat.ChatUnknownUserEvent;
 import io.manebot.log.LineLogFormatter;
 import io.manebot.platform.DefaultPlatformManager;
 import io.manebot.platform.Platform;
@@ -496,6 +500,16 @@ public final class DefaultBot implements Bot, Runnable {
                     new PropertyCommand(bot.userManager, bot.conversationProvider)).alias("prop");
             bot.commandManager.registerExecutor("repository", new RepositoryCommand(bot.systemDatabase)).alias("repo");
             bot.commandManager.registerExecutor("profile", new ProfileCommand());
+            bot.commandManager.registerExecutor("whoami", new WhoAmICommand());
+            bot.commandManager.registerExecutor("confirm", new ConfirmCommand());
+
+            Runtime.getRuntime().addShutdownHook(Virtual.getInstance().newThread(() -> {
+                try {
+                    if (bot.getState() != BotState.STOPPED) bot.stop();
+                } catch (Throwable e) {
+                    logger.log(Level.WARNING, "Problem automatically stopping on shutdown signal", e);
+                }
+            }));
 
             bot.start();
 
@@ -508,6 +522,39 @@ public final class DefaultBot implements Bot, Runnable {
 
             user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
             consolePlatformRegistration.getConnection().connect();
+
+            // registration hook
+            bot.eventManager.registerListener(new EventListener() {
+                @EventHandler
+                public void onUnknownChatUserEvent(ChatUnknownUserEvent event) {
+                    ChatMessage message = event.getMessage();
+                    ChatSender sender = message.getSender();
+                    Chat chat = sender.getChat();
+                    Platform platform = chat.getPlatform();
+
+                    // See if registration is generally allowed.
+                    if (platform != null && !platform.isRegistrationAllowed()) return;
+
+                    UserRegistration registration = chat.getUserRegistration();
+
+                    if (registration == null) registration = bot.getDefaultUserRegistration();
+                    if (registration == null) throw new NullPointerException("registration");
+
+                    try {
+                        io.manebot.user.UserAssociation association = registration.register(event.getMessage());
+                    } catch (CommandArgumentException e) {
+                        sender.sendMessage(
+                                "There was a problem registering: " + e.getMessage()
+                        );
+                    } catch (Throwable e) {
+                        logger.log(Level.WARNING, "Unexpected problem registering new user", e);
+
+                        sender.sendMessage(
+                                "There was an unexpected problem registering."
+                        );
+                    }
+                }
+            });
 
             Logger.getGlobal().info("manebot started successfully.");
 

@@ -58,6 +58,7 @@ public class DefaultEventManager implements EventManager, EventDispatcher {
         return event;
     }
 
+    @SuppressWarnings("unchecked")
     private List<EventAction> getActions(EventListener listener) {
         List<EventAction> actions = new LinkedList<>();
 
@@ -65,9 +66,12 @@ public class DefaultEventManager implements EventManager, EventDispatcher {
             EventHandler annotation = method.getAnnotation(EventHandler.class);
             if (annotation == null) continue;
 
-            if (method.getReturnType() != Void.class)
-                throw new IllegalArgumentException(method.toGenericString() + ": " +
-                        method.getReturnType().getName() + " != " + Void.class.getName());
+            if (method.getReturnType() != void.class)
+                throw new IllegalArgumentException(
+                        "Method has invalid return type: " +
+                        method.toGenericString() + ": " +
+                        method.getReturnType().getName() + " != " + void.class.getName()
+                );
 
             Class<?>[] parameters = method.getParameterTypes();
             if (parameters.length != 1)
@@ -104,11 +108,11 @@ public class DefaultEventManager implements EventManager, EventDispatcher {
             this.eventClass = eventClass;
         }
 
-        public EventExecutor getEventExecutor() {
+        private EventExecutor getEventExecutor() {
             return eventExecutor;
         }
 
-        public Class<? extends Event> getEventClass() {
+        private Class<? extends Event> getEventClass() {
             return eventClass;
         }
     }

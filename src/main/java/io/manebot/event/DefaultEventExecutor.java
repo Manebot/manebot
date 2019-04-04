@@ -23,6 +23,7 @@ public class DefaultEventExecutor implements EventExecutor {
     @Override
     public void fire(Event event) throws EventExecutionException {
         try {
+            method.setAccessible(true);
             method.invoke(eventListener, event);
         } catch (Exception e) {
             throw new EventExecutionException(e);

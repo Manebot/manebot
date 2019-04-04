@@ -121,7 +121,7 @@ public final class JavaPluginLoader implements PluginLoader {
                             + " was already loaded previously with later version " + loaded.toString() + "."
                     );
 
-                if (!attempted.equals(loaded))
+                if (loaded != null && !attempted.equals(loaded))
                     Logger.getGlobal().warning(
                             "Instead of loading " + artifact.getIdentifier() + ", shadowing with version " +
                                     loaded + " as it is already in the classloader."

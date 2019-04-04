@@ -132,9 +132,7 @@ public final class DefaultPluginManager implements PluginManager {
 
         Plugin plugin = getLoaderRegistry().getLoader(localArtifact.getFile()).load(localArtifact);
 
-        synchronized (installLock) {
-            plugins.add(plugin);
-        }
+        plugins.add(plugin);
 
         try {
             bot.getEventDispatcher().execute(new PluginRegisteredEvent(this, plugin));

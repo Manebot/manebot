@@ -13,6 +13,7 @@ import io.manebot.event.chat.ChatUnknownUserEvent;
 
 import io.manebot.user.UserAssociation;
 import io.manebot.user.UserRegistration;
+import io.manebot.user.UserType;
 
 import java.util.concurrent.Future;
 
@@ -45,35 +46,17 @@ public class DefaultChatDispatcher implements ChatDispatcher {
         if (commandMessage != null) {
             String platformSpecificId = sender.getUsername();
             UserAssociation userAssociation = chat.getPlatform().getUserAssocation(platformSpecificId);
-            if (userAssociation == null) {
-                try {
-                    bot.getEventDispatcher().execute(new ChatUnknownUserEvent(this, commandMessage));
-                } catch (EventExecutionException e) {
-                    throw new RuntimeException(e);
-                }
+            if (userAssociation == null)
+                return bot.getEventDispatcher().executeAsync(new ChatUnknownUserEvent(this, commandMessage));
 
-                UserRegistration registration =
-                        chatMessage.getSender().getPlatformUser().getConnection().getUserRegistration();
-
-                if (registration != null && registration.canRegister(chatMessage.getSender().getPlatformUser())) {
-                    try {
-                        UserAssociation association = registration.register(chatMessage);
-                        if (association != null) {
-                            sender.sendMessage(
-                                    "You have been registered as " + association.getUser().getDisplayName() + "."
-                            );
-                        }
-                    } catch (CommandArgumentException e) {
-                        sender.sendMessage("There was a problem registering your user: " + e.getMessage());
-                    } catch (CommandExecutionException e) {
-                        sender.sendMessage("There was an unexpected problem registering your user.");
-                    }
-                }
-
-                return null;
-            }
+            if (userAssociation.getUser().getType() == UserType.ANONYMOUS)
+                throw new SecurityException(
+                        userAssociation.getUser().getName()
+                        + " is an anonymous user and cannot run commands sent from a chat"
+                );
 
             Conversation conversation = bot.getConversationProvider().getConversationByChat(chat);
+
             CommandSender commandSender = userAssociation.getUser().createSender(
                     conversation,
                     chatMessage.getSender().getPlatformUser()

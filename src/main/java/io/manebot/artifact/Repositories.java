@@ -32,11 +32,7 @@ public final class Repositories {
         if (snapshotsObject.has("checksumPolicy"))
             checksumPolicy = snapshotsObject.get("checksumPolicy").getAsString();
 
-        return new RepositoryPolicy(
-                enabled,
-                updatePolicy,
-                checksumPolicy
-        );
+        return new RepositoryPolicy(enabled, updatePolicy, checksumPolicy);
     }
 
     private static Authentication readAuthentication(JsonArray authentication) {
@@ -83,29 +79,29 @@ public final class Repositories {
         return readRepositories(Repositories.class.getResourceAsStream("/default-repositories.json"));
     }
 
+    public static RemoteRepository readRepository(JsonObject repositoryObject) {
+        RemoteRepository.Builder builder = new RemoteRepository.Builder(
+                repositoryObject.get("id").getAsString(),
+                repositoryObject.get("type").getAsString(),
+                repositoryObject.get("url").getAsString()
+        );
+
+        if (repositoryObject.has("authentication"))
+            builder.setAuthentication(readAuthentication(repositoryObject.getAsJsonArray("authentication")));
+
+        if (repositoryObject.has("snapshots"))
+            builder.setSnapshotPolicy(readPolicy(repositoryObject.getAsJsonObject("snapshots")));
+
+        if (repositoryObject.has("releases"))
+            builder.setReleasePolicy(readPolicy(repositoryObject.getAsJsonObject("releases")));
+
+        return builder.build();
+    }
+
     public static List<RemoteRepository> readRepositories(JsonArray array) {
         List<RemoteRepository> remoteRepositories = new LinkedList<>();
-        for (JsonElement repositoryElement : array) {
-            JsonObject repositoryObject = repositoryElement.getAsJsonObject();
-
-            RemoteRepository.Builder builder = new RemoteRepository.Builder(
-                    repositoryObject.get("id").getAsString(),
-                    repositoryObject.get("type").getAsString(),
-                    repositoryObject.get("url").getAsString()
-            );
-
-            if (repositoryObject.has("authentication"))
-                builder.setAuthentication(readAuthentication(repositoryObject.getAsJsonArray("authentication")));
-
-            if (repositoryObject.has("snapshots"))
-                builder.setSnapshotPolicy(readPolicy(repositoryObject.getAsJsonObject("snapshots")));
-
-            if (repositoryObject.has("releases"))
-                builder.setReleasePolicy(readPolicy(repositoryObject.getAsJsonObject("releases")));
-
-            remoteRepositories.add(builder.build());
-        }
-
+        for (JsonElement repositoryElement : array)
+            remoteRepositories.add(readRepository(repositoryElement.getAsJsonObject()));
         return Collections.unmodifiableList(remoteRepositories);
     }
 }

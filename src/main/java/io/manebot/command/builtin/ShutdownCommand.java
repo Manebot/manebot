@@ -15,6 +15,9 @@ public class ShutdownCommand extends AnnotatedCommandExecutor {
 
     @Command(description = "Shuts down the bot", permission = "system.shutdown")
     public void shutdown(CommandSender sender) throws CommandExecutionException {
+        sender.sendMessage("Shutting down...");
+        sender.flush();
+
         try {
             bot.stop();
         } catch (IllegalAccessException e) {

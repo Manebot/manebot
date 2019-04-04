@@ -9,7 +9,6 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.*;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.graph.Dependency;
-import org.eclipse.aether.graph.DependencyFilter;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -18,12 +17,12 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
-import org.eclipse.aether.util.filter.DependencyFilterUtils;
 import org.eclipse.aether.version.Version;
 
 import java.io.File;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,17 +30,17 @@ import java.util.stream.Stream;
 // https://stackoverflow.com/questions/35488167/how-can-you-find-the-latest-version-of-a-maven-artifact-from-java-using-aether
 public class AetherArtifactRepository implements ArtifactRepository {
     private final LocalRepository localRepository;
-    private final List<RemoteRepository> remoteRepositories;
+    private final Supplier<List<RemoteRepository>> remoteRepositorySupplier;
     private final RepositorySystem system;
 
     public AetherArtifactRepository(
-            List<RemoteRepository> remoteRepositories,
-            File baseDir
+            File mavenHome,
+            Supplier<List<RemoteRepository>> remoteRepositorySupplier
     ) {
-        this.remoteRepositories = Collections.unmodifiableList(remoteRepositories);
+        this.remoteRepositorySupplier = remoteRepositorySupplier;
 
         this.system = newRepositorySystem();
-        this.localRepository = newLocalRepository(baseDir);
+        this.localRepository = newLocalRepository(mavenHome);
     }
 
     @Override
@@ -85,7 +84,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
         public ArtifactIdentifier getLatestVersion() {
             VersionRangeRequest request = new VersionRangeRequest(
                     new DefaultArtifact(packageId + ":" + artifactId + ":(0,]"),
-                    remoteRepositories,
+                    remoteRepositorySupplier.get(),
                     null
             );
 
@@ -110,7 +109,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
                             getPackageId() + ":" + getArtifactId() + ":" + version.toString()
                     ));
 
-            request.setRepositories(AetherArtifactRepository.this.remoteRepositories);
+            request.setRepositories(AetherArtifactRepository.this.remoteRepositorySupplier.get());
 
             ArtifactDescriptorResult result;
             try {
@@ -129,7 +128,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
         public Collection<String> getVersions() {
             VersionRangeRequest request = new VersionRangeRequest(
                     new DefaultArtifact(packageId + ":" + artifactId + ":(0,]"),
-                    remoteRepositories,
+                    AetherArtifactRepository.this.remoteRepositorySupplier.get(),
                     null
             );
 
@@ -231,7 +230,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
             request.setRepositories(
                     Stream.of(
                             dependingRepositories,
-                            AetherArtifactRepository.this.remoteRepositories
+                            AetherArtifactRepository.this.remoteRepositorySupplier.get()
                     )
                             .flatMap(Collection::stream)
                             .collect(Collectors.toList())
@@ -268,7 +267,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
             collectRequest.setRepositories(
                     Stream.of(
                             dependingRepositories,
-                            AetherArtifactRepository.this.remoteRepositories
+                            AetherArtifactRepository.this.remoteRepositorySupplier.get()
                     )
                             .flatMap(Collection::stream)
                             .collect(Collectors.toList())
@@ -309,7 +308,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
                     request.setRepositories(
                             Stream.of(
                                     dependingRepositories,
-                                    AetherArtifactRepository.this.remoteRepositories
+                                    AetherArtifactRepository.this.remoteRepositorySupplier.get()
                             )
                                     .flatMap(Collection::stream)
                                     .collect(Collectors.toList())
@@ -356,7 +355,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
                 request.setRepositories(
                         Stream.of(
                                 dependingRepositories,
-                                AetherArtifactRepository.this.remoteRepositories
+                                AetherArtifactRepository.this.remoteRepositorySupplier.get()
                         )
                                 .flatMap(Collection::stream)
                                 .collect(Collectors.toList())

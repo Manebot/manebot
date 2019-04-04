@@ -1,5 +1,8 @@
 package io.manebot;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.manebot.artifact.ArtifactRepository;
 import io.manebot.artifact.Repositories;
 import io.manebot.artifact.aether.AetherArtifactRepository;
@@ -42,12 +45,10 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.eclipse.aether.repository.RemoteRepository;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.*;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -306,132 +307,116 @@ public final class DefaultBot implements Bot, Runnable {
             handler.setLevel(Level.ALL);
             logger.addHandler(handler);
 
-            Properties systemProperties = new Properties();
-            System.getenv().forEach(systemProperties::setProperty);
+            Properties variables = new Properties();
+            System.getenv().forEach(variables::setProperty);
             System.getProperties().forEach(
-                    (key,value) -> systemProperties.setProperty(key.toString(),value.toString())
+                    (key,value) -> variables.setProperty(key.toString(),value.toString())
             );
 
             logger.info("Starting manebot...");
 
-            List<RemoteRepository> repos = new ArrayList<>();
-            repos.addAll(Repositories.getDefaultRepositories());
-
             DefaultBot bot = new DefaultBot();
 
-            List<Option> optionList = new ArrayList<>();
-            optionList.add(new Option(
-                    'h', "hibernateConfiguration", false, "hibernate.properties", value -> {
-                try (LogTimer section_configuring = new LogTimer("Configuring database")) {
-                    Properties properties = new Properties();
-                    File file = new File(value);
-                    if (file.exists()) properties.load(new FileReader(file));
-                    else properties = systemProperties;
+            try (LogTimer section_configuring = new LogTimer("Configuring database")) {
+                Properties properties = readPropertySection(variables, "database");
 
-                    try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
-                        bot.databaseManager = new HibernateManager(bot, properties);
+                try (LogTimer section_connecting = new LogTimer("Connecting to database")) {
+                    bot.databaseManager = new HibernateManager(bot, properties);
 
-                        bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
-                            model.registerEntity(Plugin.class);
-                            model.registerEntity(Database.class);
-                            model.registerEntity(Entity.class);
-                            model.registerEntity(Permission.class);
-                            model.registerEntity(Group.class);
-                            model.registerEntity(io.manebot.database.model.Platform.class);
-                            model.registerEntity(User.class);
-                            model.registerEntity(UserAssociation.class);
-                            model.registerEntity(Conversation.class);
-                            model.registerEntity(UserGroup.class);
-                            model.registerEntity(PluginProperty.class);
-                            model.registerEntity(UserBan.class);
-                            model.registerEntity(Property.class);
-                            model.registerEntity(Repository.class);
+                    bot.systemDatabase = bot.databaseManager.defineDatabase("system", (model) -> {
+                        model.registerEntity(Plugin.class);
+                        model.registerEntity(Database.class);
+                        model.registerEntity(Entity.class);
+                        model.registerEntity(Permission.class);
+                        model.registerEntity(Group.class);
+                        model.registerEntity(io.manebot.database.model.Platform.class);
+                        model.registerEntity(User.class);
+                        model.registerEntity(UserAssociation.class);
+                        model.registerEntity(Conversation.class);
+                        model.registerEntity(UserGroup.class);
+                        model.registerEntity(PluginProperty.class);
+                        model.registerEntity(UserBan.class);
+                        model.registerEntity(Property.class);
+                        model.registerEntity(Repository.class);
 
-                            return model.define();
-                        });
+                        return model.define();
+                    });
 
-                        bot.userManager = new DefaultUserManager(bot.systemDatabase);
-                        bot.platformManager = new DefaultPlatformManager(bot.systemDatabase);
-                    }
-                } catch (Exception ex) {
-                    throw new IllegalArgumentException("Problem reading Hibernate configuration", ex);
+                    bot.userManager = new DefaultUserManager(bot.systemDatabase);
+                    bot.platformManager = new DefaultPlatformManager(bot.systemDatabase);
                 }
-            }, "Hibernate configuration file"));
+            } catch (Exception ex) {
+                throw new IllegalArgumentException("Problem reading Hibernate configuration", ex);
+            }
 
-            optionList.add(new Option(
-                    'j', "customRepositories", false, null, value -> {
-                    if (value != null)
-                    {
-                        repos.clear();
-                        try {
-                            repos.addAll(Repositories.readRepositories(new FileInputStream(new File(value))));
-                        } catch (FileNotFoundException e) {
-                            throw new IllegalArgumentException("customRepositories", e);
-                        }
-                    }
-            }, "custom repositories override JSON file"));
+            for (JsonElement repository : new JsonParser().parse(new InputStreamReader(
+                    Repositories.class.getResourceAsStream("/default-repositories.json")
+            )).getAsJsonArray()) {
+                JsonObject repositoryObject = repository.getAsJsonObject();
+                String id = repositoryObject.get("id").getAsString();
 
-            optionList.add(new Option(
-                    'r', "repository", false, ".mvn", value -> {
 
-                // Additional repositories take precedence
-                repos.addAll(bot.systemDatabase.execute(s -> {
+                Repository existing;
+
+                try {
+                    existing = bot.systemDatabase.execute(s -> {
+                        return s.createQuery(
+                                "SELECT x FROM " + Repository.class.getName() + " x WHERE x.id = :id",
+                                Repository.class
+                        ).setParameter("id", id)
+                                .setMaxResults(1)
+                                .getSingleResult();
+                    });
+                } catch (javax.persistence.NoResultException ex) {
+                    existing = null;
+                }
+
+                if (existing == null) {
+                    logger.warning("Generating \"" + id + "\" system repository; does not yet exist in database.");
+
+                    bot.systemDatabase.executeTransaction(s -> {
+                        Repository newRepository = new Repository(bot.systemDatabase, id, repositoryObject.toString());
+                        s.persist(newRepository);
+                    });
+                }
+            }
+
+            // Set up maven/aether using the repository collection
+            String mavenPath = ".m2";
+
+            if (variables.containsKey("mavenPath"))
+                mavenPath = variables.getProperty("mavenPath");
+
+            bot.repository = new AetherArtifactRepository(new File(mavenPath), () -> {
+                List<RemoteRepository> remoteRepositories = new ArrayList<>();
+
+                Collection<Repository> repositories = bot.systemDatabase.execute(s -> {
                     return new ArrayList<>(s.createQuery(
                             "SELECT x FROM " + Repository.class.getName() + " x",
                             Repository.class
                     ).getResultList());
-                }).stream().map(repo ->
-                        new RemoteRepository.Builder(repo.getId(), repo.getType(), repo.getUrl())
-                                .build()).collect(Collectors.toList()
-                ));
+                });
 
-                // Default repositories
-                bot.repository = new AetherArtifactRepository(
-                        repos,
-                        new File(value)
-                );
-            }, "local maven repository path"));
+                for (Repository repository : repositories) {
+                    if (!repository.isEnabled()) continue;
 
-            Options options = new Options();
-
-            for (Option option : optionList)
-                options.addOption(Character.toString(option.commandLineLetter), option.name, !option.flag, null);
-
-            options.addOption("p", "properties", true, "java properties file");
-
-            CommandLineParser parser = new DefaultParser();
-            CommandLine cmd = parser.parse(options, args);
-
-            Properties properties = new Properties();
-            File propertiesFile = new File(cmd.getOptionValue("properties"), "manebot.properties");
-            if (propertiesFile.exists())
-                properties.load(new FileInputStream(propertiesFile));
-
-            try (LogTimer timer = new LogTimer("Parsing commandline options")) {
-                for (Option option : optionList) {
-                    String value = null;
-
-                    if (option.flag) {
-                        if (cmd.hasOption(option.name))
-                            value = "set";
-                        else {
-                            // Not set
-                        }
-                    } else {
-                        if (cmd.hasOption(option.name)) {
-                            value = cmd.getOptionValue(option.name, option.defaultValue);
-                        } else if (properties.containsKey(option.name)) {
-                            value = properties.get(option.name).toString();
-                        } else if (System.getProperties().containsKey("manebot." + option.name)) {
-                            value = System.getProperties().get("manebot." + option.name).toString();
-                        } else {
-                            value = option.defaultValue;
-                        }
+                    try {
+                        remoteRepositories.add(
+                                Repositories.readRepository(
+                                        new JsonParser().parse(repository.getJson()).getAsJsonObject()
+                                )
+                        );
+                    } catch (Exception ex) {
+                        logger.log(Level.WARNING,
+                                "Problem reading repository \"" +
+                                repository.getId() + "\" from database; " +
+                                        "this repository will be ignored."
+                        );
                     }
-
-                    if (value != null) option.valueConsumer.accept(value);
                 }
-            }
+
+                return remoteRepositories;
+            });
 
             // Get root user
             String rootUsername = "root";
@@ -503,9 +488,9 @@ public final class DefaultBot implements Bot, Runnable {
 
             Runtime.getRuntime().addShutdownHook(Virtual.getInstance().newThread(() -> {
                 try {
-                    if (bot.getState() != BotState.STOPPED) bot.stop();
+                    if (bot.getState() == BotState.RUNNING) bot.stop();
                 } catch (Throwable e) {
-                    logger.log(Level.WARNING, "Problem automatically stopping on shutdown signal", e);
+                    logger.log(Level.WARNING, "Problem automatically stopping on shutdown", e);
                 }
             }));
 
@@ -568,6 +553,16 @@ public final class DefaultBot implements Bot, Runnable {
         return repository;
     }
 
+    private static final Properties readPropertySection(Properties systemVariables, String section) {
+        Properties properties = new Properties();
+        systemVariables.forEach((key,value) -> {
+            if (value == null) return;
+            if (key.toString().toLowerCase().startsWith(section + "."))
+                properties.setProperty(key.toString().substring(section.length() + 1), value.toString());
+        });
+        return properties;
+    }
+
     private static final class LogTimer implements AutoCloseable {
         private final long start = System.currentTimeMillis();
         private final String step;
@@ -582,29 +577,6 @@ public final class DefaultBot implements Bot, Runnable {
         public void close() throws Exception {
             Logger.getGlobal().log(Level.INFO, "[" + step + "] - completed (" +
                     (System.currentTimeMillis() - start) + "ms).");
-        }
-    }
-
-    private static class Option {
-        private final char commandLineLetter;
-        private final String name;
-        private final boolean flag;
-        private final String defaultValue;
-        private final Consumer<String> valueConsumer;
-        private final String description;
-
-        private Option(char commandLineLetter,
-                       String name,
-                       boolean flag,
-                       String defaultValue,
-                       Consumer<String> valueConsumer,
-                       String description) {
-            this.commandLineLetter = commandLineLetter;
-            this.name = name;
-            this.flag = flag;
-            this.defaultValue = defaultValue;
-            this.valueConsumer = valueConsumer;
-            this.description = description;
         }
     }
 }

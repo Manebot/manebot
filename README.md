@@ -10,7 +10,7 @@
 
 Do you have a community, such a Discord server, Skype group, IRC, and/or Teamspeak 3 server? Manebot can provide you with a platform to host an automated bot system across all of your platforms that your community exists on. It's easy to run, and has a docker container to get started quickly. Manebot comes with a command-line interface that allows you to set up and configure your bot from scratch with no other dependencies and without messing around with files.
 
-*Manebot is under construction. Right now, I don't have any getting started guides to running the project.*
+**Docker image**: https://hub.docker.com/r/manevolent/manebot
 
 ### Developers
 

@@ -1,17 +1,19 @@
 package io.manebot.artifact.aether;
 
 import io.manebot.artifact.*;
+import io.manebot.artifact.ArtifactRepository;
+import io.manebot.virtual.Virtual;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
-import org.eclipse.aether.DefaultRepositorySystemSession;
-import org.eclipse.aether.RepositorySystem;
-import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.*;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.*;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.graph.Dependency;
 import org.eclipse.aether.impl.DefaultServiceLocator;
-import org.eclipse.aether.repository.LocalRepository;
-import org.eclipse.aether.repository.RemoteRepository;
+import org.eclipse.aether.internal.impl.SimpleLocalRepositoryManagerFactory;
+import org.eclipse.aether.metadata.DefaultMetadata;
+import org.eclipse.aether.metadata.Metadata;
+import org.eclipse.aether.repository.*;
 import org.eclipse.aether.resolution.*;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
@@ -102,26 +104,26 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
         @Override
         public Artifact getArtifact(String version) throws ArtifactNotFoundException {
+            DefaultArtifact artifact = new DefaultArtifact(getPackageId() + ":" + getArtifactId() + ":" + version);
+            RepositorySystemSession session = newSession(system, localRepository);
+
             ArtifactDescriptorRequest request = new ArtifactDescriptorRequest();
-
-            request.setArtifact(
-                    new DefaultArtifact(
-                            getPackageId() + ":" + getArtifactId() + ":" + version.toString()
-                    ));
-
+            request.setArtifact(artifact);
             request.setRepositories(AetherArtifactRepository.this.remoteRepositorySupplier.get());
-
             ArtifactDescriptorResult result;
             try {
                 result = system.readArtifactDescriptor(
-                        newSession(system, localRepository),
+                        session,
                         request
                 );
             } catch (ArtifactDescriptorException e) {
                 throw new ArtifactNotFoundException(e);
             }
 
-            return new AetherArtifact(null, result.getArtifact(), result);
+            if (result.getRepository() instanceof LocalRepository)
+                return new LocalAetherArtifact(null, result.getArtifact(), result);
+            else
+                return new AetherArtifact(null, result.getArtifact(), result);
         }
 
         @Override
@@ -236,9 +238,7 @@ public class AetherArtifactRepository implements ArtifactRepository {
                             .collect(Collectors.toList())
             );
 
-
             request.setArtifact(aetherArtifact);
-            request.setRepositories(dependingRepositories);
 
             ArtifactResult result;
             try {
@@ -291,47 +291,16 @@ public class AetherArtifactRepository implements ArtifactRepository {
                 if (artifactResult.getArtifact().toString().equals(aetherArtifact.toString()))
                     continue; // skip own dependency
 
-                if (artifactResult.isResolved()) {
-                    dependencies.add(new AetherDependency(
-                            this,
-                            new LocalAetherArtifact(
-                                    this,
-                                    artifactResult.getArtifact(),
-                                    null // may cause NPE but is the best way to go about this for efficiency
-                            ),
-                            ArtifactDependencyLevel.COMPILE,
-                            true
-                    ));
-                } else {
-                    ArtifactDescriptorRequest request = new ArtifactDescriptorRequest();
-                    request.setArtifact(artifactResult.getArtifact());
-                    request.setRepositories(
-                            Stream.of(
-                                    dependingRepositories,
-                                    AetherArtifactRepository.this.remoteRepositorySupplier.get()
-                            )
-                                    .flatMap(Collection::stream)
-                                    .collect(Collectors.toList())
-                    );
-                    ArtifactDescriptorResult descriptorResult;
-
-                    try {
-                        descriptorResult = system.readArtifactDescriptor(session, request);
-                    } catch (ArtifactDescriptorException e) {
-                        throw new ArtifactNotFoundException(artifactResult.getArtifact().toString(), e);
-                    }
-
-                    dependencies.add(new AetherDependency(
-                            this,
-                            new AetherArtifact(
-                                    this,
-                                    artifactResult.getArtifact(),
-                                    descriptorResult
-                            ),
-                            ArtifactDependencyLevel.COMPILE,
-                            true
-                    ));
-                }
+                dependencies.add(new AetherDependency(
+                        this,
+                        new LocalAetherArtifact(
+                                this,
+                                artifactResult.getArtifact(),
+                                null // may cause NPE but is the best way to go about this for efficiency
+                        ),
+                        ArtifactDependencyLevel.COMPILE,
+                        true
+                ));
             }
 
             return dependencies;
@@ -406,14 +375,10 @@ public class AetherArtifactRepository implements ArtifactRepository {
     private class LocalAetherArtifact
             extends AetherArtifact
             implements LocalArtifact {
-        private final File file;
-
         private LocalAetherArtifact(AetherArtifact parent,
                                     org.eclipse.aether.artifact.Artifact aetherArtifact,
                                     ArtifactDescriptorResult result) {
             super(parent, aetherArtifact, result);
-
-            this.file = Objects.requireNonNull(aetherArtifact.getFile());
         }
 
         @Override
@@ -428,7 +393,22 @@ public class AetherArtifactRepository implements ArtifactRepository {
 
         @Override
         public File getFile() {
-            return file;
+            ArtifactRequest request = new ArtifactRequest();
+            request.setRepositories(Collections.emptyList());
+            request.setArtifact(super.aetherArtifact);
+
+            ArtifactResult result;
+
+            try {
+                result = system.resolveArtifact(
+                        newSession(system, localRepository),
+                        request
+                );
+            } catch (ArtifactResolutionException e) {
+                throw new RuntimeException(e);
+            }
+
+            return Objects.requireNonNull(result.getArtifact().getFile());
         }
 
         @Override
@@ -509,9 +489,59 @@ public class AetherArtifactRepository implements ArtifactRepository {
         return locator.getService(RepositorySystem.class);
     }
 
-    private static DefaultRepositorySystemSession newSession(RepositorySystem system, LocalRepository localRepository) {
+    private static DefaultRepositorySystemSession newSession(RepositorySystem system,
+                                                             LocalRepository localRepository) {
         // Create a new session object
         DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();
+        session.setRepositoryListener(new AbstractRepositoryListener() {
+            @Override
+            public void artifactResolving(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().fine("Resolving artifact " +
+                        repositoryEvent.getArtifact().toString() + "...");
+            }
+
+            @Override
+            public void artifactResolved(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().fine("Resolved artifact " +
+                        repositoryEvent.getArtifact().toString() + ".");
+            }
+
+            @Override
+            public void metadataResolving(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().fine("Resolving metadata " +
+                        repositoryEvent.getArtifact().toString() + "...");
+            }
+
+            @Override
+            public void metadataResolved(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().fine("Resolved metadata " +
+                        repositoryEvent.getArtifact().toString() + ".");
+            }
+
+            @Override
+            public void artifactDownloading(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().info("Downloading artifact " +
+                        repositoryEvent.getArtifact().toString() + "...");
+            }
+
+            @Override
+            public void artifactDownloaded(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().info("Downloaded artifact " +
+                        repositoryEvent.getArtifact().toString() + ".");
+            }
+
+            @Override
+            public void metadataDownloading(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().info("Downloading metadata for " +
+                        repositoryEvent.getArtifact().toString() + "...");
+            }
+
+            @Override
+            public void metadataDownloaded(RepositoryEvent repositoryEvent) {
+                Virtual.getInstance().getLogger().info("Downloaded metadata for " +
+                        repositoryEvent.getArtifact().toString() + "...");
+            }
+        });
 
         // Associate local repository
         session.setLocalRepositoryManager(system.newLocalRepositoryManager(session, localRepository));

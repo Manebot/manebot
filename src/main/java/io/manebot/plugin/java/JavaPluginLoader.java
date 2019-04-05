@@ -16,6 +16,7 @@ import io.manebot.plugin.java.classloader.LocalClassLoader;
 import io.manebot.plugin.java.classloader.LocalURLClassLoader;
 import io.manebot.plugin.loader.PluginLoader;
 import io.manebot.virtual.Virtual;
+import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.io.FileNotFoundException;
@@ -98,17 +99,17 @@ public final class JavaPluginLoader implements PluginLoader {
             // We cannot unloaded classes that have already been loaded into the JRE.
             if (instance.isLoaded()) {
                 // This plugin is loaded, check the version we are trying to load.
-                Version attempted;
+                ArtifactVersion attempted;
                 try {
-                    attempted = Version.fromString(artifact.getVersion());
+                    attempted = new DefaultArtifactVersion(artifact.getVersion());
                 } catch (IllegalArgumentException ex) {
                     // You're on your own here.
                     return instance;
                 }
 
-                Version loaded;
+                ArtifactVersion loaded;
                 try {
-                    loaded = Version.fromString(instance.getArtifact().getVersion());
+                    loaded = new DefaultArtifactVersion(instance.getArtifact().getVersion());
                 } catch (IllegalArgumentException ex) {
                     // You're on your own here.
                     return instance;
@@ -121,7 +122,7 @@ public final class JavaPluginLoader implements PluginLoader {
                             + " was already loaded previously with later version " + loaded.toString() + "."
                     );
 
-                if (loaded != null && !attempted.equals(loaded))
+                if (!attempted.equals(loaded))
                     Logger.getGlobal().warning(
                             "Instead of loading " + artifact.getIdentifier() + ", shadowing with version " +
                                     loaded + " as it is already in the classloader."

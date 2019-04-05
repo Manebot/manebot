@@ -17,20 +17,20 @@ import java.util.List;
 
 public final class Repositories {
     private static RepositoryPolicy readPolicy(JsonObject policyObject) {
-        JsonObject snapshotsObject = policyObject;
-
         boolean enabled = true;
 
-        if (snapshotsObject.has("enabled"))
-            enabled = snapshotsObject.get("enabled").getAsBoolean();
+        if (policyObject.has("enabled"))
+            enabled = policyObject.get("enabled").getAsBoolean();
 
-        String updatePolicy = null;
-        if (snapshotsObject.has("updatePolicy"))
-            updatePolicy = snapshotsObject.get("updatePolicy").getAsString();
+        String updatePolicy;
+        if (policyObject.has("updatePolicy"))
+            updatePolicy = policyObject.get("updatePolicy").getAsString();
+        else
+            updatePolicy = "daily";
 
         String checksumPolicy = null;
-        if (snapshotsObject.has("checksumPolicy"))
-            checksumPolicy = snapshotsObject.get("checksumPolicy").getAsString();
+        if (policyObject.has("checksumPolicy"))
+            checksumPolicy = policyObject.get("checksumPolicy").getAsString();
 
         return new RepositoryPolicy(enabled, updatePolicy, checksumPolicy);
     }

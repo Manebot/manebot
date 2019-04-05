@@ -9,6 +9,7 @@ import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.command.executor.chained.AnnotatedCommandExecutor;
+import io.manebot.command.executor.chained.argument.CommandArgumentFollowing;
 import io.manebot.command.executor.chained.argument.CommandArgumentLabel;
 import io.manebot.command.executor.chained.argument.CommandArgumentPage;
 import io.manebot.command.executor.chained.argument.CommandArgumentString;
@@ -81,7 +82,7 @@ public class RepositoryCommand extends AnnotatedCommandExecutor {
     public void add(CommandSender sender,
                         @CommandArgumentLabel.Argument(label = "add") String add,
                         @CommandArgumentString.Argument(label = "id") String id,
-                        @CommandArgumentString.Argument(label = "json") String json)
+                        @CommandArgumentFollowing.Argument() String json)
             throws CommandExecutionException, SQLException {
         // make sure ID isn't set
         JsonObject object = new JsonParser().parse(json).getAsJsonObject();

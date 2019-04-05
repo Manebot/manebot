@@ -90,9 +90,6 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             if (pluginManager.getPlugin(dependency.getChild().getIdentifier().withoutVersion()) != null)
                 continue;
 
-            sender.sendMessage("Installing " + dependency.getChild().getIdentifier().toString() + "...");
-            sender.flush();
-
             try {
                 installDependencies(sender, pluginManager.getDependencies(dependency.getChild().getIdentifier()));
             } catch (Throwable e) {
@@ -113,6 +110,8 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                     );
             }
 
+            sender.sendMessage("Installing " + dependency.getChild().getIdentifier().toString() + "...");
+            sender.flush();
             pluginManager.install(dependency.getChild().getIdentifier());
         }
     }
@@ -196,6 +195,8 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         if (artifactIdentifier == null)
             throw new CommandArgumentException("Plugin not found, or no versions are available.");
 
+        sender.sendMessage("Resolving dependencies for " + artifactIdentifier.toString() + "...");
+
         // Install dependencies if required
         Collection<ArtifactDependency> dependencies;
         try {
@@ -203,6 +204,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         } catch (ArtifactRepositoryException e) {
             throw new CommandExecutionException("Failed to find dependencies for " + artifactIdentifier, e);
         }
+
         installDependencies(sender, dependencies);
 
         PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());

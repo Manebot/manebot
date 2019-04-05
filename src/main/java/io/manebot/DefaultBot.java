@@ -192,7 +192,7 @@ public final class DefaultBot implements Bot, Runnable {
 
             // Start all auto-start plugins
             for (io.manebot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
-                if (!plugin.getRegistration().willAutoStart()) continue;
+                if (plugin.getRegistration() != null && !plugin.getRegistration().willAutoStart()) continue;
 
                 try {
                     plugin.setEnabled(true);

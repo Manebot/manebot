@@ -404,12 +404,11 @@ public final class JavaPluginLoader implements PluginLoader {
                 // Otherwise, we'd break database and other class loading features
                 CompletableFuture<JavaPlugin> instantiationFuture = new CompletableFuture<>();
                 Virtual.getInstance().create(() -> {
-                    Thread.currentThread().setContextClassLoader(classLoader);
-
                     try {
+                        Thread.currentThread().setContextClassLoader(classLoader);
                         pluginEntry.instantiate(builder);
                         instantiationFuture.complete(builder.build());
-                    } catch (PluginException e) {
+                    } catch (Throwable e) {
                         instantiationFuture.completeExceptionally(e);
                     }
                 }).start();

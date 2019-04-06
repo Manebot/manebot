@@ -154,7 +154,7 @@ public final class JavaPlugin implements Plugin, EventListener {
 
     @Override
     public PluginRegistration getRegistration() {
-        return pluginManager.getPlugin(getArtifact().getIdentifier());
+        return pluginManager.getPlugin(getArtifact().getIdentifier().withoutVersion());
     }
 
     @Override

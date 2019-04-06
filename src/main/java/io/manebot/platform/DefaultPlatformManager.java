@@ -6,6 +6,7 @@ import io.manebot.plugin.PluginException;
 
 import java.sql.SQLException;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class DefaultPlatformManager implements PlatformManager {
@@ -23,56 +24,20 @@ public class DefaultPlatformManager implements PlatformManager {
     }
 
     @Override
-    public Platform.Builder buildPlatform(Plugin plugin) {
-        return new Platform.Builder(plugin) {
-            private io.manebot.database.model.Platform platform;
+    public PlatformRegistration registerPlatform(Consumer<Platform.Builder> consumer) {
+        Builder builder = new Builder();
+        consumer.accept(builder);
 
-            public Platform.Builder withId(String id) {
-                this.platform = getOrCreatePlatformById(id);
-                super.withId(id);
-                return this;
-            }
+        io.manebot.database.model.Platform platform = builder.getPlatform();
+        PlatformRegistration registration = builder.build();
 
-            @Override
-            public Platform getPlatform() {
-                return platform;
-            }
+        registrations.add(registration);
+        registrationMap.put(platform, registration);
+        registrationByNameMap.put(registration.getName(), registration);
 
-            @Override
-            public PlatformRegistration build() {
-                synchronized (platformLock) {
-                    // Should never happen.
-                    if (platform == null)
-                        throw new NullPointerException("platform");
+        platform.setRegistration(registration);
 
-                    if (platform.getRegistration() != null) {
-                        throw new IllegalStateException(
-                                "Platform is already registered to another Plugin: " +
-                                        platform.getRegistration().getPlugin().getArtifact().getIdentifier()
-                        );
-                    }
-
-                    DefaultPlatformRegistration registration = new DefaultPlatformRegistration(
-                            platform,
-                            this,
-                            plugin
-                    );
-
-                    registrations.add(registration);
-                    registrationMap.put(platform, registration);
-                    registrationByNameMap.put(registration.getName(), registration);
-
-                    platform.setRegistration(registration);
-
-                    return registration;
-                }
-            }
-        };
-    }
-
-    @Override
-    public Platform.Builder buildPlatform() {
-        return buildPlatform(null);
+        return registration;
     }
 
     @Override
@@ -198,6 +163,43 @@ public class DefaultPlatformManager implements PlatformManager {
         @Override
         public Plugin getPlugin() {
             return plugin;
+        }
+    }
+
+    public class Builder extends Platform.Builder {
+        private io.manebot.database.model.Platform platform;
+
+        @Override
+        public Builder setId(String id) {
+            this.platform = getOrCreatePlatformById(id);
+            super.setId(id);
+            return this;
+        }
+
+        @Override
+        public io.manebot.database.model.Platform getPlatform() {
+            return platform;
+        }
+
+        private PlatformRegistration build() {
+            synchronized (platformLock) {
+                // Should never happen.
+                if (platform == null)
+                    throw new NullPointerException("platform");
+
+                if (platform.getRegistration() != null) {
+                    throw new IllegalStateException(
+                            "Platform is already registered to another Plugin: " +
+                                    platform.getRegistration().getPlugin().getArtifact().getIdentifier()
+                    );
+                }
+
+                return new DefaultPlatformRegistration(
+                        platform,
+                        this,
+                        getPlugin()
+                );
+            }
         }
     }
 }

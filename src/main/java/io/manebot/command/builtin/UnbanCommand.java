@@ -35,12 +35,4 @@ public class UnbanCommand extends AnnotatedCommandExecutor {
     public String getDescription() {
         return "Unbans a user";
     }
-
-    private long calculateNextBanLength(User user) {
-        long oneMonthAgo = System.currentTimeMillis() - 2628002000L;
-        long bansInLastMonth =
-                user.getBans().stream().filter(x -> x.getEnd().getTime() > oneMonthAgo).count();
-        long seconds = 300 * (2 ^ bansInLastMonth);
-        return seconds;
-    }
 }

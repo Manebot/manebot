@@ -10,7 +10,6 @@ import io.manebot.chat.*;
 import io.manebot.command.*;
 import io.manebot.command.builtin.*;
 import io.manebot.command.exception.CommandArgumentException;
-import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.conversation.ConversationProvider;
 import io.manebot.conversation.DefaultConversationProvider;
 import io.manebot.database.DatabaseManager;
@@ -39,16 +38,11 @@ import io.manebot.user.*;
 import io.manebot.virtual.DefaultVirtual;
 import io.manebot.virtual.SynchronousTransfer;
 import io.manebot.virtual.Virtual;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.Options;
 import org.eclipse.aether.repository.RemoteRepository;
 
 import java.io.*;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -82,7 +76,7 @@ public final class DefaultBot implements Bot, Runnable {
     private ArtifactRepository repository;
     private UserManager userManager;
     private DatabaseManager databaseManager;
-    private PlatformManager platformManager;
+    private DefaultPlatformManager platformManager;
     private DefaultPluginManager pluginManager;
     private ChatDispatcher chatDispatcher;
     private CommandDispatcher commandDispatcher;
@@ -338,8 +332,6 @@ public final class DefaultBot implements Bot, Runnable {
                         model.registerEntity(UserBan.class);
                         model.registerEntity(Property.class);
                         model.registerEntity(Repository.class);
-
-                        return model.define();
                     });
 
                     bot.userManager = new DefaultUserManager(bot.systemDatabase);
@@ -497,12 +489,11 @@ public final class DefaultBot implements Bot, Runnable {
             bot.start();
 
             // Console:
-            Platform.Builder platformBuilder = bot.platformManager.buildPlatform();
-            PlatformRegistration consolePlatformRegistration = platformBuilder
-                    .withId("console").withName("Console")
-                    .withConnection(new ConsolePlatformConnection(bot, platformBuilder.getPlatform()))
-                    .build();
-
+            PlatformRegistration consolePlatformRegistration = bot.platformManager.registerPlatform(builder -> builder
+                    .setId("console")
+                    .setName("Console")
+                    .setConnection(new ConsolePlatformConnection(bot, builder.getPlatform()))
+            );
             user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
             consolePlatformRegistration.getConnection().connect();
 

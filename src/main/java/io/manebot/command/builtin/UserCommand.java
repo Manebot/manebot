@@ -104,7 +104,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
             sender.list(
                     io.manebot.database.model.User.class,
                     searchHandler.search(query, 6),
-                    (sender1, user) -> user.getDisplayName()
+                    (textBuilder, user) -> textBuilder.append(user.getDisplayName())
             ).send();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -124,7 +124,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
                         .sorted(Comparator.comparing(User::getDisplayName))
                         .collect(Collectors.toList()))
                 .page(page)
-                .responder((sender1, user) -> user.getDisplayName())
+                .responder((textBuilder, user) -> textBuilder.append(user.getDisplayName()))
                 .build()
         ).send();
     }

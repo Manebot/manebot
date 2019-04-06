@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -162,11 +163,14 @@ public class HibernateManager implements DatabaseManager {
                 .build();
 
         Metadata metadata = buildMetadata(serviceRegistry, attributeConverters, modelClasses);
-        SchemaUpdate schemaUpdate = new SchemaUpdate();
-        schemaUpdate.setHaltOnError(true);
-        schemaUpdate.setDelimiter(";");
-        schemaUpdate.setFormat(true);
-        schemaUpdate.execute(EnumSet.of(TargetType.DATABASE), metadata, serviceRegistry);
+
+        if (updateClasses.size() >= 0) {
+            SchemaUpdate schemaUpdate = new SchemaUpdate();
+            schemaUpdate.setHaltOnError(true);
+            schemaUpdate.setDelimiter(";");
+            schemaUpdate.setFormat(true);
+            schemaUpdate.execute(EnumSet.of(TargetType.DATABASE), metadata, serviceRegistry);
+        }
 
         return metadata.getSessionFactoryBuilder().applyInterceptor(interceptor).build();
     }
@@ -187,156 +191,11 @@ public class HibernateManager implements DatabaseManager {
     }
 
     @Override
-    public io.manebot.database.Database defineDatabase(String name,
-                                   Function<Database.ModelConstructor,
-                                           io.manebot.database.Database> function) {
+    public io.manebot.database.Database defineDatabase(String name, Consumer<Database.ModelConstructor> function) {
         return databases.computeIfAbsent(name, key -> {
-            Database.ModelConstructor constructor = new io.manebot.database.Database.ModelConstructor()
-            {
-                private final Set<io.manebot.database.Database> dependentDatabases
-                        = new LinkedHashSet<>();
-
-                /**
-                 * All entities that must be accessible by this database, including self entities as defined below.
-                 */
-                private final Set<Class<?>> allEntities = new LinkedHashSet<>();
-
-                /**
-                 * Entities specific to this database at the dependency node level
-                 */
-                private final Set<Class<?>> selfEntities = new LinkedHashSet<>();
-
-                private ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-
-                private final Collection<AttributeConverter<?,?>> attributeConverters = new LinkedList<>();
-
-                private boolean updateSchema = true; // schema is updated by default
-
-                @Override
-                public io.manebot.database.Database.ModelConstructor setClassLoader(ClassLoader classLoader) {
-                    this.classLoader = classLoader;
-                    return this;
-                }
-
-                @Override
-                public ClassLoader getClassLoader() {
-                    return classLoader;
-                }
-
-                @Override
-                public String getDatabaseName() {
-                    return key;
-                }
-
-                @Override
-                public io.manebot.database.Database getSystemDatabase() {
-                    return getBot().getSystemDatabase();
-                }
-
-                /**
-                 * Recursive function used to obtain all needed entity class definitions for this dependency tree
-                 * @param database database to depend
-                 */
-                private void dependIntl(io.manebot.database.Database database) {
-                    if (!(database instanceof Database))
-                        throw new IllegalArgumentException(
-                                "database",
-                                new ClassCastException(
-                                        databases.getClass().getName() +
-                                                " cannot be cast to " +
-                                                Database.class.getName()));
-
-                    if (((Database) database).instance != HibernateManager.this) {
-                        throw new IllegalArgumentException(
-                                "database",
-                                new IllegalAccessException(
-                                        database.getClass().getName()
-                                                + " was created by a different instance of " +
-                                                HibernateManager.class.getName()));
-                    }
-
-                    // depend on database self entities in the respective tree for this database
-                    ((Database) database).selfEntities.forEach(this::registerDependentEntity);
-
-                    // depend on this database's children, as well.
-                    for (io.manebot.database.Database child :
-                            ((Database) database).dependentDatabases)
-                        dependIntl(child);
-                }
-
-                @Override
-                public Database.ModelConstructor depend(io.manebot.database.Database database) {
-                    dependIntl(database);
-
-                    dependentDatabases.add(database);
-
-                    return this;
-                }
-
-                private void registerDependentEntity(Class<?> aClass) {
-                    // recognize in the large list
-                    if (!allEntities.add(aClass))
-                        throw new IllegalStateException("entity class " + aClass.getName() + " already registered");
-                }
-
-                private void registerSelfEntity(Class<?> aClass) {
-                    // recognize in self list (used for future dependency graphing)
-                    if (!selfEntities.add(aClass))
-                        throw new IllegalStateException("entity class " + aClass.getName() + " already registered");
-                }
-
-                @Override
-                public Database.ModelConstructor registerEntity(Class<?> aClass) {
-                    registerDependentEntity(aClass); // done for HashSet duplication checking
-                    registerSelfEntity(aClass); // done for future dependency resolution
-
-                    return this;
-                }
-
-                @Override
-                public <X, Y extends X> io.manebot.database.Database.ModelConstructor
-                    registerEntityAssociation(Class<Y> aClass, Class<X> aClass1) {
-                    attributeConverters.add(new AttributeConverter<X, Y>() {
-                        @Override
-                        public Y convertToDatabaseColumn(X x) {
-                            return (Y) x;
-                        }
-
-                        @Override
-                        public X convertToEntityAttribute(Y y) {
-                            return y;
-                        }
-                    });
-
-                    return this;
-                }
-
-                @Override
-                public boolean willUpdateSchema() {
-                    return updateSchema;
-                }
-
-                @Override
-                public io.manebot.database.Database.ModelConstructor setUpdateSchema(boolean flag) {
-                    this.updateSchema = false;
-                    return this;
-                }
-
-                @Override
-                public Database define() {
-                    return new Database(
-                            name,
-                            selfEntities,
-                            allEntities,
-                            attributeConverters,
-                            classLoader,
-                            dependentDatabases,
-                            updateSchema
-                    );
-                }
-            };
-
-            return function.apply(constructor);
+            ModelConstructor constructor = new ModelConstructor(key);
+            function.accept(constructor);
+            return constructor.build();
         });
     }
 
@@ -549,6 +408,155 @@ public class HibernateManager implements DatabaseManager {
 
         public Object newInstance(Serializable id) {
             return instantiator.apply(id);
+        }
+    }
+
+    private class ModelConstructor implements io.manebot.database.Database.ModelConstructor {
+        private final String name;
+
+        private final Set<io.manebot.database.Database> dependentDatabases
+                = new LinkedHashSet<>();
+
+        /**
+         * All entities that must be accessible by this database, including self entities as defined below.
+         */
+        private final Set<Class<?>> allEntities = new LinkedHashSet<>();
+
+        /**
+         * Entities specific to this database at the dependency node level
+         */
+        private final Set<Class<?>> selfEntities = new LinkedHashSet<>();
+
+        private ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+        private final Collection<AttributeConverter<?,?>> attributeConverters = new LinkedList<>();
+
+        private boolean updateSchema = true; // schema is updated by default
+
+        private ModelConstructor(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public io.manebot.database.Database.ModelConstructor setClassLoader(ClassLoader classLoader) {
+            this.classLoader = classLoader;
+            return this;
+        }
+
+        @Override
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
+
+        @Override
+        public String getDatabaseName() {
+            return name;
+        }
+
+        @Override
+        public io.manebot.database.Database getSystemDatabase() {
+            return getBot().getSystemDatabase();
+        }
+
+        /**
+         * Recursive function used to obtain all needed entity class definitions for this dependency tree
+         * @param database database to depend
+         */
+        private void dependIntl(io.manebot.database.Database database) {
+            if (!(database instanceof Database))
+                throw new IllegalArgumentException(
+                        "database",
+                        new ClassCastException(
+                                databases.getClass().getName() +
+                                        " cannot be cast to " +
+                                        Database.class.getName()));
+
+            if (((Database) database).instance != HibernateManager.this) {
+                throw new IllegalArgumentException(
+                        "database",
+                        new IllegalAccessException(
+                                database.getClass().getName()
+                                        + " was created by a different instance of " +
+                                        HibernateManager.class.getName()));
+            }
+
+            // depend on database self entities in the respective tree for this database
+            ((Database) database).selfEntities.forEach(this::registerDependentEntity);
+
+            // depend on this database's children, as well.
+            for (io.manebot.database.Database child :
+                    ((Database) database).dependentDatabases)
+                dependIntl(child);
+        }
+
+        @Override
+        public Database.ModelConstructor addDependency(io.manebot.database.Database database) {
+            dependIntl(database);
+
+            dependentDatabases.add(database);
+
+            return this;
+        }
+
+        private void registerDependentEntity(Class<?> aClass) {
+            // recognize in the large list
+            if (!allEntities.add(aClass))
+                throw new IllegalStateException("entity class " + aClass.getName() + " already registered");
+        }
+
+        private void registerSelfEntity(Class<?> aClass) {
+            // recognize in self list (used for future dependency graphing)
+            if (!selfEntities.add(aClass))
+                throw new IllegalStateException("entity class " + aClass.getName() + " already registered");
+        }
+
+        @Override
+        public Database.ModelConstructor registerEntity(Class<?> aClass) {
+            registerDependentEntity(aClass); // done for HashSet duplication checking
+            registerSelfEntity(aClass); // done for future dependency resolution
+
+            return this;
+        }
+
+        @Override
+        public <X, Y extends X> io.manebot.database.Database.ModelConstructor
+        registerEntityAssociation(Class<Y> aClass, Class<X> aClass1) {
+            attributeConverters.add(new AttributeConverter<X, Y>() {
+                @Override
+                public Y convertToDatabaseColumn(X x) {
+                    return (Y) x;
+                }
+
+                @Override
+                public X convertToEntityAttribute(Y y) {
+                    return y;
+                }
+            });
+
+            return this;
+        }
+
+        @Override
+        public boolean willUpdateSchema() {
+            return updateSchema;
+        }
+
+        @Override
+        public io.manebot.database.Database.ModelConstructor setUpdateSchema(boolean flag) {
+            this.updateSchema = false;
+            return this;
+        }
+
+        private Database build() {
+            return new Database(
+                    name,
+                    selfEntities,
+                    allEntities,
+                    attributeConverters,
+                    classLoader,
+                    dependentDatabases,
+                    updateSchema
+            );
         }
     }
 }

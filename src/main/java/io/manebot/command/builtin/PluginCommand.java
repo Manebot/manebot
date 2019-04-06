@@ -112,6 +112,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
 
             sender.sendMessage("Installing " + dependency.getChild().getIdentifier().toString() + "...");
             sender.flush();
+
             pluginManager.install(dependency.getChild().getIdentifier());
         }
     }
@@ -196,6 +197,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             throw new CommandArgumentException("Plugin not found, or no versions are available.");
 
         sender.sendMessage("Resolving dependencies for " + artifactIdentifier.toString() + "...");
+        sender.flush();
 
         // Install dependencies if required
         Collection<ArtifactDependency> dependencies;
@@ -215,6 +217,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             );
 
         sender.sendMessage("Installing " + artifactIdentifier.toString() + "...");
+        sender.flush();
 
         try {
             registration = pluginManager.install(artifactIdentifier);

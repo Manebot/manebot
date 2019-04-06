@@ -1,7 +1,6 @@
 package io.manebot.plugin.java;
 
 import io.manebot.Bot;
-import io.manebot.Version;
 import io.manebot.artifact.*;
 import io.manebot.command.CommandManager;
 import io.manebot.database.DatabaseManager;
@@ -27,7 +26,6 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -409,7 +407,8 @@ public final class JavaPluginLoader implements PluginLoader {
                     Thread.currentThread().setContextClassLoader(classLoader);
 
                     try {
-                        instantiationFuture.complete((JavaPlugin) pluginEntry.instantiate(builder));
+                        pluginEntry.instantiate(builder);
+                        instantiationFuture.complete(builder.build());
                     } catch (PluginException e) {
                         instantiationFuture.completeExceptionally(e);
                     }

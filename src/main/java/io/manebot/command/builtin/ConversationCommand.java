@@ -32,11 +32,7 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
     public ConversationCommand(ConversationProvider conversationProvider, Database database) {
         this.conversationProvider = conversationProvider;
         this.searchHandler = database.createSearchHandler(io.manebot.database.model.Conversation.class)
-                .string(new SearchHandlerPropertyContains("name"))
-                .argument("owner", new ComparingSearchHandler(
-                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("displayName")),
-                        new SearchHandlerPropertyEquals(root -> root.get("owningUser").get("username")),
-                        SearchOperator.INCLUDE))
+                .string(new SearchHandlerPropertyContains("id"))
                 .argument("platform", new SearchHandlerPropertyEquals(root -> root.get("platform").get("id")))
                 .build();
     }
@@ -50,7 +46,7 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
             sender.list(
                     io.manebot.database.model.Conversation.class,
                     searchHandler.search(query, 6),
-                    (sender1, conversation) -> conversation.getId()
+                    (textBuilder, conversation) -> textBuilder.append(conversation.getId())
             ).send();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -71,7 +67,7 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
                         .sorted(Comparator.comparing(Conversation::getId))
                         .collect(Collectors.toList()))
                         .page(page)
-                        .responder((sender1, conversation) -> conversation.getId())
+                        .responder((textBuilder, conversation) -> textBuilder.append(conversation.getId()))
                         .build()
         ).send();
     }

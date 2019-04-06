@@ -56,7 +56,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
                                         .collect(Collectors.toList())
                         ))
                         .page(page)
-                        .responder((sender1, property) -> property.getName())
+                        .responder((textBuilder, property) -> textBuilder.append(property.getName()))
                         .build()
         ).send();
     }
@@ -74,7 +74,6 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
         entity.getPropery(name).set(Base64.getDecoder().decode(base64));
         sender.sendMessage("Property set.");
     }
-
 
     @Command(description = "Gets property for an entity", permission = "system.user.property.get")
     public void remove(CommandSender sender,

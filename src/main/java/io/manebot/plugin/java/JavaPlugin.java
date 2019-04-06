@@ -35,7 +35,7 @@ public final class JavaPlugin implements Plugin, EventListener {
     private final Artifact artifact;
 
     private final Map<ManifestIdentifier, Plugin> dependencyMap;
-    private final Collection<Function<Platform.Builder, PlatformRegistration>> platformBuilders;
+    private final Collection<Consumer<Platform.Builder>> platformBuilders;
     private final Map<String, Function<Future, CommandExecutor>> commandExecutors;
     private final Collection<EventListener> eventListeners;
     private final Collection<Consumer<Plugin>> dependencyListeners;
@@ -64,7 +64,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                        EventManager eventManager,
                        Artifact artifact,
                        Map<ManifestIdentifier, Plugin> dependencyMap,
-                       Collection<Function<Platform.Builder, PlatformRegistration>> platformBuilders,
+                       Collection<Consumer<Platform.Builder>> platformBuilders,
                        Map<String, Function<Future, CommandExecutor>> commandExecutors,
                        Collection<EventListener> eventListeners,
                        Collection<Consumer<Plugin>> dependencyListeners,
@@ -315,11 +315,17 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         // Register & load platforms
-        for (Function<Platform.Builder, PlatformRegistration> function : platformBuilders) {
-            Platform.Builder builder = platformManager.buildPlatform(this);
+        for (Consumer<Platform.Builder> consumer : platformBuilders) {
+            PlatformRegistration registration = platformManager.registerPlatform(builder -> {
+                // this should not need to be set by the consumer
+                builder.setPlugin(this);
 
-            PlatformRegistration registration;
-            platforms.put(builder.getId(), registration = function.apply(builder));
+                consumer.accept(builder);
+            });
+
+            platforms.put(registration.getPlatform().getId(), registration);
+
+            // Connect platform here
             registration.getConnection().connect();
         }
 
@@ -392,7 +398,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         private final Artifact artifact;
         private final Map<ManifestIdentifier, Plugin> dependencyMap;
 
-        private final Collection<Function<Platform.Builder, PlatformRegistration>> platformBuilders = new LinkedList<>();
+        private final Collection<Consumer<Platform.Builder>> platformBuilders = new LinkedList<>();
         private final Collection<EventListener> eventListeners = new LinkedList<>();
         private final Collection<Consumer<Plugin>> dependencyListeners = new LinkedList<>();
         private final Collection<PluginFunction> enable = new LinkedList<>();
@@ -441,7 +447,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public Plugin.Builder listen(EventListener eventListener) {
+        public Plugin.Builder addListener(EventListener eventListener) {
             eventListeners.add(eventListener);
             return this;
         }
@@ -470,20 +476,20 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public Plugin.Builder command(String label, Function<Future, CommandExecutor> function) {
+        public Plugin.Builder addCommand(String label, Function<Future, CommandExecutor> function) {
             commandExecutors.put(label, function);
             return this;
         }
 
         @Override
-        public Plugin.Builder platform(Function<Platform.Builder, PlatformRegistration> function) {
+        public Plugin.Builder addPlatform(Consumer<Platform.Builder> function) {
             platformBuilders.add(function);
             return this;
         }
 
         @Override
         public <T extends PluginReference>
-        Plugin.Builder instance(Class<T> aClass, Function<Future, T> function) {
+        Plugin.Builder setInstance(Class<T> aClass, Function<Future, T> function) {
             instanceMap.put(aClass, function);
             return this;
         }
@@ -501,24 +507,22 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public Database database(String s, Function<Database.ModelConstructor, Database> function) {
+        public Database addDatabase(String s, Consumer<Database.ModelConstructor> consumer) {
             Database database = databaseManager.defineDatabase(
                     getArtifact().getIdentifier().withoutVersion().toString() + "_" + s,
-                    function
+                    consumer
             );
 
             databases.add(database);
-
             return database;
         }
 
-        public Builder type(PluginType type) {
+        public Builder setType(PluginType type) {
             this.type = type;
             return this;
         }
 
-        @Override
-        public Plugin build() {
+        public JavaPlugin build() {
             return new JavaPlugin(
                     bot,
                     instance,
@@ -527,7 +531,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                     commandManager,
                     pluginManager,
                     eventManager,
-                    getArtifact(),
+                    artifact,
                     dependencyMap,
                     platformBuilders,
                     commandExecutors,

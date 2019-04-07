@@ -48,7 +48,7 @@ public class BanCommand extends AnnotatedCommandExecutor {
             throws CommandExecutionException {
         User user = userManager.getUserByDisplayName(username);
         if (user == null) throw new CommandArgumentException("User not found");
-        sender.list(
+        sender.sendList(
                 UserBan.class,
                 builder -> builder.direct(new ArrayList<>(user.getBans())).page(page)
                         .responder((textBuilder, userBan) -> {
@@ -61,8 +61,8 @@ public class BanCommand extends AnnotatedCommandExecutor {
                                 textBuilder.append("until " + userBan.getEnd() +
                                         " (issued " + userBan.getDate() + " by "
                                         + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
-                        }).build()
-        ).send();
+                        })
+        );
     }
 
     @Command(description = "List bans", permission = "system.ban.list")
@@ -70,7 +70,7 @@ public class BanCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentLabel.Argument(label = "list") String list,
                      @CommandArgumentPage.Argument() int page)
             throws CommandExecutionException {
-        sender.list(
+        sender.sendList(
                 UserBan.class,
                 builder -> builder.direct(new ArrayList<>(userManager.getBans())).page(page)
                         .responder((textBuilder, userBan) -> {
@@ -83,8 +83,8 @@ public class BanCommand extends AnnotatedCommandExecutor {
                                 textBuilder.append(userBan.getUser().getDisplayName() + ": until " + userBan.getEnd() +
                                         " (issued " + userBan.getDate() + " by "
                                         + userBan.getBanningUser().getDisplayName() + ")" + pardoned);
-                        }).build()
-        ).send();
+                        })
+        );
     }
 
     @Override

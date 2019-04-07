@@ -52,7 +52,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                        @CommandArgumentSearch.Argument Search query)
             throws CommandExecutionException {
         try {
-            sender.list(
+            sender.sendList(
                     io.manebot.database.model.Plugin.class,
                     searchHandler.search(query, 6),
                     (textBuilder, plugin) ->
@@ -60,7 +60,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                                     plugin.getArtifactIdentifier().getArtifactId(),
                                     EnumSet.of(TextStyle.BOLD)
                             ).append(" (" + plugin.getArtifactIdentifier() + ")")
-            ).send();
+            );
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -70,7 +70,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
     public void list(CommandSender sender,
                      @CommandArgumentLabel.Argument(label = "list") String list,
                      @CommandArgumentPage.Argument() int page) throws CommandExecutionException {
-        sender.list(
+        sender.sendList(
                 Plugin.class,
                 builder -> builder.direct(pluginManager.getLoadedPlugins()
                         .stream()
@@ -81,7 +81,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                         textBuilder.append(plugin.getName(), EnumSet.of(TextStyle.BOLD))
                                 .append(" (" + plugin.getArtifact().getIdentifier() + ")"))
                 .build()
-        ).send();
+        );
     }
 
     private void installDependencies(CommandSender sender, Collection<ArtifactDependency> dependencies)
@@ -463,11 +463,11 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         if (registration == null)
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
 
-        sender.list(
+        sender.sendList(
                 PluginProperty.class,
                 builder -> builder.direct(new ArrayList<>(registration.getProperties())).page(page)
                 .responder((chatSender, pluginProperty) -> pluginProperty.getName()).build()
-        ).send();
+        );
     }
 
     @Command(description = "Gets current plugin information", permission = "system.plugin.info")
@@ -492,7 +492,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
     }
 
     private void info(CommandSender sender, PluginRegistration registration) throws CommandExecutionException {
-        sender.details(builder -> {
+        sender.sendDetails(builder -> {
             builder.name("Plugin").key(registration.getIdentifier().withoutVersion().toString())
                     .item("Version", registration.getIdentifier().getVersion());
 
@@ -520,9 +520,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                 }
             } else
                 builder.item("Loaded", "false");
-
-            return builder.build();
-        }).send();
+        });
     }
 
     @Command(description = "Enables a plugin", permission = "system.plugin.enable")

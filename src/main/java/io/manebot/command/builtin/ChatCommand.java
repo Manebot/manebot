@@ -38,7 +38,7 @@ public class ChatCommand extends AnnotatedCommandExecutor {
         if (!platform.isConnected())
             throw new CommandArgumentException("Platform is not connected.");
 
-        sender.list(
+        sender.sendList(
                 Chat.class,
                 builder -> builder.direct(platform.getConnection().getChats()
                         .stream()
@@ -48,8 +48,7 @@ public class ChatCommand extends AnnotatedCommandExecutor {
                         .responder((textBuilder, chat1) ->
                                 textBuilder.append(chat1.getId(), EnumSet.of(TextStyle.BOLD))
                                         .append(" " + (chat1.isConnected() ? "(connected)" : "(disconnected)")))
-                        .build()
-        ).send();
+        );
     }
 
     @Command(description = "Gets current chat information", permission = "system.chat.info")
@@ -142,7 +141,7 @@ public class ChatCommand extends AnnotatedCommandExecutor {
     }
 
     private void info(CommandSender sender, Chat chat) throws CommandExecutionException {
-        sender.details(builder -> {
+        sender.sendDetails(builder -> {
             builder.name("Chat").key(chat.getId());
             builder.item("Platform", chat.getPlatform().getId());
 
@@ -158,9 +157,7 @@ public class ChatCommand extends AnnotatedCommandExecutor {
             } else {
                 builder.item("Connected", "false");
             }
-
-            return builder.build();
-        }).send();
+        });
     }
 
     @Override

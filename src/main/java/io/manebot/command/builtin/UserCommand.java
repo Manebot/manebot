@@ -101,11 +101,11 @@ public class UserCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentSearch.Argument Search query)
             throws CommandExecutionException {
         try {
-            sender.list(
+            sender.sendList(
                     io.manebot.database.model.User.class,
                     searchHandler.search(query, 6),
                     (textBuilder, user) -> textBuilder.append(user.getDisplayName())
-            ).send();
+            );
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -116,7 +116,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentLabel.Argument(label = "list") String list,
                      @CommandArgumentPage.Argument int page)
             throws CommandExecutionException {
-        sender.list(
+        sender.sendList(
                 User.class,
                 builder -> builder.direct(
                         userManager.getUsers()
@@ -125,8 +125,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
                         .collect(Collectors.toList()))
                 .page(page)
                 .responder((textBuilder, user) -> textBuilder.append(user.getDisplayName()))
-                .build()
-        ).send();
+        );
     }
 
     @Command(description = "Creates a user", permission = "system.user.create")
@@ -177,7 +176,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
                 user.getDisplayName() :
                 user.getName();
 
-        sender.details(builder -> {
+        sender.sendDetails(builder -> {
             builder.name("User").key(exposedUsername);
 
             Date lastSeen = user.getLastSeenDate();
@@ -188,9 +187,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
 
             builder.item("Registered", user.getRegisteredDate().toString());
             builder.item("Groups", user.getGroups().stream().map(UserGroup::getName).collect(Collectors.toList()));
-
-            return builder.build();
-        }).send();
+        });
     }
 
     @Command(description = "Gets user connections", permission = "system.user.connection.list")
@@ -204,7 +201,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
         if (user == null)
             throw new CommandArgumentException("User not found.");
 
-        sender.list(
+        sender.sendList(
                 UserAssociation.class,
                 builder -> builder.direct(user.getAssociations()
                         .stream()
@@ -218,8 +215,7 @@ public class UserCommand extends AnnotatedCommandExecutor {
                         textBuilder.append(assoc.getPlatform().getId(), EnumSet.of(TextStyle.BOLD))
                                 .append(": ")
                                 .append(assoc.getPlatformId()))
-                .build()
-        ).send();
+        );
     }
 
     @Command(description = "Creates a user connection", permission = "system.user.connection.create")

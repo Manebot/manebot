@@ -31,7 +31,7 @@ public class HelpCommand extends AnnotatedCommandExecutor {
                 .sorted(Comparator.comparing(CommandManager.Registration::getLabel))
                 .collect(Collectors.toList());
 
-        sender.list(
+        sender.sendList(
                 CommandManager.Registration.class,
                 builder -> builder.direct(registrations)
                         .page(page)
@@ -39,8 +39,8 @@ public class HelpCommand extends AnnotatedCommandExecutor {
                                 textBuilder.append(registration.getLabel(), EnumSet.of(TextStyle.BOLD))
                                         .append(": ")
                                         .append(registration.getExecutor().getDescription())
-                        ).build()
-        ).send();
+                        )
+        );
     }
 
     @Command(description = "Gets command help")
@@ -74,15 +74,14 @@ public class HelpCommand extends AnnotatedCommandExecutor {
         Collections.sort(helpLines);
 
         int finalPageNumber = pageNumber;
-        sender.list(
+        sender.sendList(
                 String.class,
                 stringBuilder -> stringBuilder.direct(helpLines)
                         .page(finalPageNumber)
                         .responder((textBuilder, line) ->
                                 textBuilder.append(subCommandLabel, EnumSet.of(TextStyle.BOLD)).append(" ").append(line)
                         )
-                        .build()
-        ).send();
+        );
     }
 
     @Override

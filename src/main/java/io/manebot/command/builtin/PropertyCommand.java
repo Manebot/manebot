@@ -47,7 +47,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
 
         Entity entity = entityFunction.apply(entityName);
 
-        sender.list(
+        sender.sendList(
                 Property.class,
                 builder -> builder
                         .direct(new ArrayList<>(
@@ -57,8 +57,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
                         ))
                         .page(page)
                         .responder((textBuilder, property) -> textBuilder.append(property.getName()))
-                        .build()
-        ).send();
+        );
     }
 
     @Command(description = "Sets property on an entity", permission = "system.user.property.set")

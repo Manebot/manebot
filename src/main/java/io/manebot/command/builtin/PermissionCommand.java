@@ -48,7 +48,7 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
 
         Entity entity = entityFunction.apply(entityName);
 
-        sender.list(
+        sender.sendList(
                 GrantedPermission.class,
                 builder -> builder
                         .direct(new ArrayList<>(entity.getPermissions()))
@@ -59,8 +59,7 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
                                         .append(" (granted by " + permission.getGranter().getDisplayName() +
                                         " on " + permission.getDate() + ")")
                         )
-                        .build()
-        ).send();
+        );
     }
 
     @Command(description = "Adds permissions to an entity", permission = "system.permission.add")

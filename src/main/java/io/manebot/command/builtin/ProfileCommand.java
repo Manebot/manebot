@@ -125,7 +125,7 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
         }
 
         // Get details
-        sender.details(builder -> builder.name("Profiler").key(profiler.getName())
+        sender.sendDetails(builder -> builder.name("Profiler").key(profiler.getName())
                         .item("Status", (profiler.isRunning() ? "Active" : "Inactive"))
                 .item("Lifetime", lifetimeSeconds +
                         " (" +
@@ -141,8 +141,7 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
                         secondsPerExecutionChild + " child" +
                         ")")
                 .item("Children (" + childrenCount + ")", children)
-                .build()
-        ).send();
+        );
     }
 
     @Override

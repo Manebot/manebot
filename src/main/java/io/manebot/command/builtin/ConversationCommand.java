@@ -43,11 +43,11 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
                        @CommandArgumentSearch.Argument Search query)
             throws CommandExecutionException {
         try {
-            sender.list(
+            sender.sendList(
                     io.manebot.database.model.Conversation.class,
                     searchHandler.search(query, 6),
                     (textBuilder, conversation) -> textBuilder.append(conversation.getId())
-            ).send();
+            );
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -59,7 +59,7 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentPage.Argument int page)
             throws CommandExecutionException {
 
-        sender.list(
+        sender.sendList(
                 Conversation.class,
                 builder -> builder.direct(
                         conversationProvider.getConversations()
@@ -68,8 +68,7 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
                         .collect(Collectors.toList()))
                         .page(page)
                         .responder((textBuilder, conversation) -> textBuilder.append(conversation.getId()))
-                        .build()
-        ).send();
+        );
     }
 
     @Command(description = "Gets current chat information", permission = "system.conversation.info")
@@ -96,13 +95,11 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
     }
 
     private void info(CommandSender sender, Conversation conversation) throws CommandExecutionException {
-        sender.details(builder -> {
+        sender.sendDetails(builder -> {
             builder.name("Conversation").key(conversation.getId());
             builder.item("Platform", conversation.getPlatform().getId());
             builder.item("Connected", Boolean.toString(conversation.isConnected()));
-
-            return builder.build();
-        }).send();
+        });
     }
 
     @Override

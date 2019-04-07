@@ -15,13 +15,12 @@ public class VersionCommand extends AnnotatedCommandExecutor {
 
     @Command(description = "Gets verison information", permission = "system.version")
     public void version(CommandSender sender) throws CommandExecutionException {
-        sender.details(builder -> builder.name("Project").key(BuildInformation.getName())
+        sender.sendDetails(builder -> builder.name("Project").key(BuildInformation.getName())
                 .item("Version", BuildInformation.getVersion())
                 .item("API version", BuildInformation.getApiVersion())
                 .item("VCS commit", BuildInformation.getId())
                 .item("Timestamp", BuildInformation.getTimestamp())
-                .build()
-        ).send();
+        );
     }
 
     @Override

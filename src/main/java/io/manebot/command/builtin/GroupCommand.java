@@ -58,14 +58,14 @@ public class GroupCommand extends AnnotatedCommandExecutor {
                        @CommandArgumentSearch.Argument Search query)
             throws CommandExecutionException {
         try {
-            sender.list(
+            sender.sendList(
                     io.manebot.database.model.Group.class,
                     searchHandler.search(query, 6),
                     (textBuilder, group) ->
                             textBuilder.append(group.getName(), EnumSet.of(TextStyle.BOLD))
                             .append(" (" + group.getUsers().size() + " users, owned by " +
                             group.getOwner().getDisplayName() + ")")
-            ).send();
+            );
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -76,7 +76,7 @@ public class GroupCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentLabel.Argument(label = "list") String list,
                      @CommandArgumentPage.Argument int page)
             throws CommandExecutionException {
-        sender.list(
+        sender.sendList(
                 UserGroup.class,
                 builder -> builder.direct(
                         userManager.getUserGroups()
@@ -86,10 +86,10 @@ public class GroupCommand extends AnnotatedCommandExecutor {
                         .page(page)
                         .responder((textBuilder, group) ->
                                 textBuilder.append(group.getName(), EnumSet.of(TextStyle.BOLD))
-                                .append(" (" + group.getUsers().size() +
-                                " users, owned by " + group.getOwner().getDisplayName() + ")"))
+                                        .append(" (" + group.getUsers().size() +
+                                                " users, owned by " + group.getOwner().getDisplayName() + ")"))
                         .build()
-        ).send();
+        );
     }
 
     @Command(description = "Creates a group", permission = "system.group.create")
@@ -111,10 +111,9 @@ public class GroupCommand extends AnnotatedCommandExecutor {
         UserGroup group = userManager.getUserGroupByName(name);
         if (group == null) throw new CommandArgumentException("Group does not exist.");
 
-        sender.details(builder -> builder.name("Group").key(group.getName())
+        sender.sendDetails(builder -> builder.name("Group").key(group.getName())
                 .item("Owner", group.getOwner().getDisplayName())
                 .item("Members", group.getUsers().stream().map(User::getDisplayName).collect(Collectors.toList()))
-                .build()
         );
     }
 

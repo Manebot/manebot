@@ -148,12 +148,11 @@ public class RepositoryCommand extends AnnotatedCommandExecutor {
                 new JsonParser().parse(repo.getJson()).getAsJsonObject()
         );
 
-        sender.details(builder -> builder
+        sender.sendDetails(builder -> builder
                 .name("Repository").key(repo.getId())
                 .item("URL", remoteRepository.getUrl())
                 .item("Enabeled", Boolean.toString(repo.isEnabled()))
-                .build()
-        ).send();
+        );
     }
 
     @Command(description = "Lists repositories", permission = "system.repository.list")
@@ -169,7 +168,7 @@ public class RepositoryCommand extends AnnotatedCommandExecutor {
             return new ArrayList<>(s.createQuery(criteriaQuery).getResultList());
         });
 
-        sender.list(
+        sender.sendList(
                 Repository.class,
                 builder -> builder
                         .direct(new ArrayList<>(repo))
@@ -178,7 +177,6 @@ public class RepositoryCommand extends AnnotatedCommandExecutor {
                                 .append(repo1.getId(), EnumSet.of(TextStyle.BOLD))
                                 .append(" ")
                                 .append((repo1.isEnabled() ? "(enabled)" : "(disabled)")))
-                        .build()
-        ).send();
+        );
     }
 }

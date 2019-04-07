@@ -60,11 +60,11 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                        @CommandArgumentSearch.Argument Search query)
             throws CommandExecutionException {
         try {
-            sender.list(
+            sender.sendList(
                     io.manebot.database.model.Platform.class,
                     searchHandler.search(query, 6),
                     modelFormatter
-            ).send();
+            );
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -134,7 +134,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentLabel.Argument(label = "list") String list,
                      @CommandArgumentPage.Argument int page)
             throws CommandExecutionException {
-        sender.list(
+        sender.sendList(
                 Platform.class,
                 builder -> builder
                         .direct(platformManager.getPlatforms()
@@ -143,8 +143,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                                 .collect(Collectors.toList()))
                         .page(page)
                         .responder(abstractFormatter)
-                        .build()
-        ).send();
+        );
     }
 
     @Command(description = "Gets platform information", permission = "system.platform.info")
@@ -156,7 +155,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
         if (platform == null)
             throw new CommandArgumentException("Platform not found.");
 
-        sender.details(builder -> {
+        sender.sendDetails(builder -> {
             builder.name("Platform").key(platform.getId());
 
             if (platform.getPlugin() != null) {
@@ -171,9 +170,7 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
             } else {
                 builder.item("Registered", "false");
             }
-
-            return builder.build();
-        }).send();
+        });
     }
 
     @Override

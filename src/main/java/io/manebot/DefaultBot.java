@@ -457,7 +457,7 @@ public final class DefaultBot implements Bot, Runnable {
             bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("version", new VersionCommand(bot)).alias("ver");
             bot.commandManager.registerExecutor("platform",
-                    new PlatformCommand(userManager, bot.platformManager, bot.systemDatabase));
+                    new PlatformCommand(bot.userManager, bot.platformManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("chat", new ChatCommand(bot.platformManager));
             bot.commandManager.registerExecutor("conversation",
                     new ConversationCommand(bot.conversationProvider, bot.systemDatabase)).alias("conv");

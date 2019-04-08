@@ -56,6 +56,8 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
         this.searchHandler = database
                 .createSearchHandler(io.manebot.database.model.Platform.class)
                 .string(new SearchHandlerPropertyContains("id"))
+                .sort("name", "id")
+                .defaultSort("name")
                 .build();
     }
 

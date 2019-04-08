@@ -43,6 +43,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                 .string(new SearchHandlerPropertyContains("artifactId"))
                 .command("enabled", new SearchHandlerPropertyEquals("enabled", Boolean::parseBoolean))
                 .command("disabled", new SearchHandlerPropertyEquals("enabled", Boolean::parseBoolean).not())
+                .sort("name", "artifactId")
                 .build();
     }
 

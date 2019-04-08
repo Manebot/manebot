@@ -49,6 +49,8 @@ public class GroupCommand extends AnnotatedCommandExecutor {
                                 SearchOperator.INCLUDE
                         )
                 ))
+                .sort("name", "name")
+                .defaultSort("name")
                 .build();
     }
 

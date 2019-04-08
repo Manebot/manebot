@@ -1,6 +1,8 @@
 package io.manebot.database.search;
 
 import io.manebot.database.Database;
+import io.manebot.database.search.handler.SearchArgumentHandler;
+import io.manebot.database.search.handler.SearchOrderHandler;
 
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.*;
@@ -14,20 +16,28 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
     private final Class<T> entityClass;
     private final Map<String, SearchArgumentHandler> argumentHandlers;
     private final Map<String, SearchArgumentHandler> commandHandlers;
-    private final SearchArgumentHandler stringHandler;
     private final Collection<Consumer<Clause<T>>> always;
+    private final Map<String, SearchOrderHandler> orderHandlers;
+
+    private final SearchArgumentHandler stringHandler;
+    private final Search.Order defaultOrder;
 
     public DefaultSearchHandler(Database database, Class<T> entityClass,
                                 Map<String, SearchArgumentHandler> argumentHandlers,
                                 Map<String, SearchArgumentHandler> commandHandlers,
                                 SearchArgumentHandler stringHandler,
-                                Collection<Consumer<Clause<T>>> always) {
+                                Collection<Consumer<Clause<T>>> always,
+                                Map<String, SearchOrderHandler> orderHandlers,
+                                Search.Order defaultOrder) {
         this.database = database;
         this.entityClass = entityClass;
         this.argumentHandlers = argumentHandlers;
         this.commandHandlers = commandHandlers;
         this.stringHandler = stringHandler;
         this.always = always;
+
+        this.orderHandlers = orderHandlers;
+        this.defaultOrder = defaultOrder;
     }
 
     @Override
@@ -113,11 +123,33 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
                         Collections.emptyList()
                 );
             } else {
+                // SELECT clause
                 selectQuery.select(root);
+
+                // WHERE clause
                 selectQuery.where(predicates);
+
+                // ORDER BY clause
+                List<Search.Order> searchOrders = new ArrayList<>(search.getOrders());
+                if (searchOrders.size() <= 0 && defaultOrder != null) // default to the default order if none are given
+                    searchOrders.add(defaultOrder);
+
+                List<Order> compiledOrders = new ArrayList<>();
+                if (search.getOrders().size() > 0) {
+                    for (Search.Order order : searchOrders) {
+                        SearchOrderHandler handler = this.orderHandlers.get(order.getKey().toLowerCase());
+                        if (handler == null)
+                            throw new IllegalArgumentException("Unknown sort order: " + order.getKey());
+
+                        compiledOrders.add(handler.handle(root, criteriaBuilder, order.getOrder()));
+                    }
+                }
+
+                if (compiledOrders.size() > 0) selectQuery.orderBy(compiledOrders);
+
                 TypedQuery typedQuery = s.createQuery(selectQuery);
-                typedQuery.setFirstResult(maxResults * (search.getPage()-1));
-                typedQuery.setMaxResults(maxResults);
+                typedQuery.setFirstResult(maxResults * (search.getPage()-1)); // page enumeration
+                typedQuery.setMaxResults(maxResults); // LIMIT clause
                 List resultList = typedQuery.getResultList();
 
                 return new DefaultSearchResult<T>(
@@ -243,7 +275,10 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         private final Class<T> entityClass;
         private final Map<String, SearchArgumentHandler> argumentHandlers = new LinkedHashMap<>();
         private final Map<String, SearchArgumentHandler> commandHandlers = new LinkedHashMap<>();
+        private final Map<String, SearchOrderHandler> orderHandlers = new LinkedHashMap<>();
         private final Collection<Consumer<Clause<T>>> always = new LinkedList<>();
+
+        private Search.Order defaultOrder;
         private SearchArgumentHandler stringHandler;
 
         public Builder(Database database, Class<T> entityClass) {
@@ -276,6 +311,21 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         }
 
         @Override
+        public SearchHandler.Builder<T> sort(String key, SearchOrderHandler handler) {
+            orderHandlers.put(key.toLowerCase(), handler);
+            return this;
+        }
+
+        @Override
+        public SearchHandler.Builder<T> defaultSort(String key, SortOrder order) {
+            if (!orderHandlers.containsKey(key.toLowerCase()))
+                throw new IllegalArgumentException("Unknown sort order: " + key);
+
+            defaultOrder = new Search.DefaultOrder(key.toLowerCase(), order);
+            return this;
+        }
+
+        @Override
         public SearchHandler<T> build() throws IllegalArgumentException {
             return new DefaultSearchHandler<>(
                     database,
@@ -283,7 +333,9 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
                     argumentHandlers,
                     commandHandlers,
                     stringHandler,
-                    always
+                    always,
+                    orderHandlers,
+                    defaultOrder
             );
         }
     }

@@ -44,9 +44,7 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
                      @CommandArgumentString.Argument(label = "entity name") String entityName,
                      @CommandArgumentPage.Argument int page)
             throws CommandExecutionException {
-        Function<String, Entity>  entityFunction = createEntityAccessor(entityType);
-
-        Entity entity = entityFunction.apply(entityName);
+        Entity entity = createEntityAccessor(entityType).apply(entityName);
 
         sender.sendList(
                 GrantedPermission.class,
@@ -81,8 +79,7 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
                     @CommandArgumentString.Argument(label = "permission node") String node,
                     @CommandArgumentSwitch.Argument(labels = {"allow", "deny"}) String grant)
             throws CommandExecutionException {
-        Function<String, Entity>  entityFunction = createEntityAccessor(entityType);
-        Entity entity = entityFunction.apply(entityName);
+        Entity entity = createEntityAccessor(entityType).apply(entityName);
         if (entity.getPermission(node) != null)
             throw new CommandArgumentException("Permission already granted to entity.");
         node = node.toLowerCase();
@@ -100,8 +97,7 @@ public class PermissionCommand extends AnnotatedCommandExecutor {
                        @CommandArgumentString.Argument(label = "permission node") String node)
             throws CommandExecutionException {
         Permission.checkPermission(node);
-        Function<String, Entity>  entityFunction = createEntityAccessor(entityType);
-        Entity entity = entityFunction.apply(entityName);
+        Entity entity = createEntityAccessor(entityType).apply(entityName);
         if (entity.getPermission(node) == null)
             throw new CommandArgumentException("Permission not granted to entity.");
         node = node.toLowerCase();

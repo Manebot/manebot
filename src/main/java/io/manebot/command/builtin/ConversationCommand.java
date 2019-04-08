@@ -34,6 +34,8 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
         this.searchHandler = database.createSearchHandler(io.manebot.database.model.Conversation.class)
                 .string(new SearchHandlerPropertyContains("id"))
                 .argument("platform", new SearchHandlerPropertyEquals(root -> root.get("platform").get("id")))
+                .sort("name", "id")
+                .defaultSort("name")
                 .build();
     }
 

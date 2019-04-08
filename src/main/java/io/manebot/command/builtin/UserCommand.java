@@ -54,6 +54,8 @@ public class UserCommand extends AnnotatedCommandExecutor {
                         io.manebot.database.model.UserGroup.class,
                         new SearchHandlerPropertyEquals(root -> root.get("group").get("name"))
                 ))
+                .sort("username", "username")
+                .sort("displayname", "displayname")
                 .build();
     }
 

@@ -8,10 +8,10 @@ import io.manebot.command.executor.chained.AnnotatedCommandExecutor;
 import io.manebot.command.executor.chained.argument.CommandArgumentLabel;
 import io.manebot.command.executor.chained.argument.CommandArgumentPage;
 import io.manebot.command.executor.chained.argument.CommandArgumentString;
+import io.manebot.command.executor.chained.argument.CommandArgumentSwitch;
 import io.manebot.command.response.CommandListResponse;
 import io.manebot.command.search.CommandArgumentSearch;
 import io.manebot.database.Database;
-import io.manebot.database.model.Group;
 import io.manebot.database.search.Search;
 import io.manebot.database.search.SearchHandler;
 import io.manebot.database.search.handler.SearchHandlerPropertyContains;
@@ -19,6 +19,8 @@ import io.manebot.platform.Platform;
 import io.manebot.platform.PlatformManager;
 import io.manebot.plugin.Plugin;
 import io.manebot.plugin.PluginException;
+import io.manebot.user.UserGroup;
+import io.manebot.user.UserManager;
 
 import java.sql.SQLException;
 import java.util.Comparator;
@@ -26,6 +28,7 @@ import java.util.EnumSet;
 import java.util.stream.Collectors;
 
 public class PlatformCommand extends AnnotatedCommandExecutor {
+    private final UserManager userManager;
     private final PlatformManager platformManager;
     private final SearchHandler<io.manebot.database.model.Platform> searchHandler;
 
@@ -47,7 +50,8 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                                     EnumSet.of(TextStyle.ITALICS)
                             );
 
-    public PlatformCommand(PlatformManager platformManager, Database database) {
+    public PlatformCommand(UserManager userManager, PlatformManager platformManager, Database database) {
+        this.userManager = userManager;
         this.platformManager = platformManager;
         this.searchHandler = database
                 .createSearchHandler(io.manebot.database.model.Platform.class)
@@ -68,6 +72,62 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
             );
         } catch (SQLException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Command(description = "Unsets the new user group for a platform", permission = "system.platform.defaultgroup.set")
+    public void unsetDefaultGroup(CommandSender sender,
+                                @CommandArgumentLabel.Argument(label = "unset") String set,
+                                @CommandArgumentLabel.Argument(label = "newusergroup") String newusergroup,
+                                @CommandArgumentString.Argument(label = "platform id") String platformId)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null) throw new CommandArgumentException("Platform not found.");
+
+        platform.setDefaultGroup(null);
+
+        sender.sendMessage("New user registrations for " + platform.getId() + " will not be added to any group.");
+    }
+
+    @Command(description = "Sets the new user group for a platform", permission = "system.platform.defaultgroup.set")
+    public void setDefaultGroup(CommandSender sender,
+                                @CommandArgumentLabel.Argument(label = "set") String set,
+                                @CommandArgumentLabel.Argument(label = "newusergroup") String newusergroup,
+                                @CommandArgumentString.Argument(label = "platform id") String platformId,
+                                @CommandArgumentString.Argument(label = "group name") String groupName)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null) throw new CommandArgumentException("Platform not found.");
+
+        UserGroup userGroup = userManager.getUserGroupByName(groupName);
+        if (userGroup == null) throw new CommandArgumentException("Group not found.");
+
+        platform.setDefaultGroup(userGroup);
+
+        sender.sendMessage(
+                "New user registrations for " + platform.getId() +
+                " will be added to " + userGroup.getName() + "."
+        );
+    }
+
+    @Command(description = "Sets the registration behavior for a platform", permission = "system.platform.registration.set")
+    public void setRegistration(CommandSender sender,
+                                @CommandArgumentLabel.Argument(label = "set") String set,
+                                @CommandArgumentLabel.Argument(label = "registration") String registratiopn,
+                                @CommandArgumentString.Argument(label = "platform id") String platformId,
+                                @CommandArgumentSwitch.Argument(labels = {"enable","disable"}) String switchValue)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null) throw new CommandArgumentException("Platform not found.");
+
+        boolean allowed = switchValue.equalsIgnoreCase("enable");
+
+        platform.setRegistrationAllowed(allowed);
+
+        if (allowed) {
+            sender.sendMessage("User registration enabled for " + platform.getId() + ".");
+        } else {
+            sender.sendMessage("User registration disabled for " + platform.getId() + ".");
         }
     }
 
@@ -173,7 +233,9 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                 builder.item("Registered", "false");
             }
 
-            Group group = platform.getDefaultGroup();
+            builder.item("User registration", platform.isRegistrationAllowed() ? "enabled" : "disabled");
+
+            UserGroup group = platform.getDefaultGroup();
             if (group != null) {
                 builder.item("New user group", group.getName());
             } else {

@@ -27,7 +27,6 @@ import io.manebot.event.chat.ChatUnknownUserEvent;
 import io.manebot.log.LineLogFormatter;
 import io.manebot.platform.DefaultPlatformManager;
 import io.manebot.platform.Platform;
-import io.manebot.platform.PlatformManager;
 import io.manebot.platform.PlatformRegistration;
 import io.manebot.platform.console.ConsolePlatformConnection;
 import io.manebot.plugin.DefaultPluginManager;
@@ -458,7 +457,7 @@ public final class DefaultBot implements Bot, Runnable {
             bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("version", new VersionCommand(bot)).alias("ver");
             bot.commandManager.registerExecutor("platform",
-                    new PlatformCommand(bot.platformManager, bot.systemDatabase));
+                    new PlatformCommand(userManager, bot.platformManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("chat", new ChatCommand(bot.platformManager));
             bot.commandManager.registerExecutor("conversation",
                     new ConversationCommand(bot.conversationProvider, bot.systemDatabase)).alias("conv");

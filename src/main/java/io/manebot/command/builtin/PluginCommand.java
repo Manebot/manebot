@@ -113,8 +113,6 @@ public class PluginCommand extends AnnotatedCommandExecutor {
 
             sender.sendMessage("Installing " + dependency.getChild().getIdentifier().toString() + "...");
             sender.flush();
-
-            pluginManager.install(dependency.getChild().getIdentifier());
         }
     }
 
@@ -298,6 +296,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
 
                 // Final removal check
                 boolean canRemove =
+                        !plugin.getRegistration().isRequired() &&
                         plugin.getType() == PluginType.DEPENDENCY &&
                                 blockingArtifactDependencies.size() <= 0 &&
                                 blockingPlugins.size() <= 0;
@@ -353,6 +352,9 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
         if (registration == null || !registration.isInstalled())
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (registration.isRequired())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is required.");
 
         artifactIdentifier = registration.getIdentifier();
 
@@ -497,6 +499,9 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             builder.name("Plugin").key(registration.getIdentifier().withoutVersion().toString())
                     .item("Version", registration.getIdentifier().getVersion());
 
+            builder.item("Auto start", registration.willAutoStart() ? "true" : "false");
+            builder.item("Required", registration.isRequired() ? "true" : "false");
+
             if (registration.isLoaded()) {
                 builder.item("Loaded", "true");
 
@@ -521,6 +526,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                 }
             } else
                 builder.item("Loaded", "false");
+
         });
     }
 
@@ -554,7 +560,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             }
         }
 
-        if (registration.getInstance().isEnabled())
+        if (registration.getInstance().isEnabled() && registration.willAutoStart())
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is already enabled.");
 
         sender.sendMessage("Enabling " + artifactIdentifier.toString() + "...");
@@ -594,7 +600,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         if (!registration.isLoaded())
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not loaded.");
 
-        if (!registration.getInstance().isEnabled())
+        if (!registration.getInstance().isEnabled() && !registration.willAutoStart())
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not enabled.");
 
         sender.sendMessage("Disabling " + registration.getIdentifier() + "...");
@@ -616,6 +622,54 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         registration.setAutoStart(false);
 
         sender.sendMessage("Disabled " + registration.getIdentifier().toString() + ".");
+    }
+
+    @Command(description = "Requires a plugin", permission = "system.plugin.require")
+    public void require(CommandSender sender,
+                          @CommandArgumentLabel.Argument(label = "require") String require,
+                          @CommandArgumentString.Argument(label = "identifier") String identifier)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (!registration.isLoaded())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not loaded.");
+
+        if (registration.isRequired())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is already required.");
+
+        registration.setRequired(true);
+
+        sender.sendMessage(registration.getIdentifier().toString() + " is now required at startup.");
+    }
+
+    @Command(description = "Unrequires a plugin", permission = "system.plugin.unrequire")
+    public void unrequire(CommandSender sender,
+                        @CommandArgumentLabel.Argument(label = "unrequire") String unrequire,
+                        @CommandArgumentString.Argument(label = "identifier") String identifier)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (!registration.isLoaded())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not loaded.");
+
+        if (!registration.isRequired())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not required.");
+
+        registration.setRequired(false);
+
+        sender.sendMessage(registration.getIdentifier().toString() + " is no longer required at startup.");
     }
 
     @Override

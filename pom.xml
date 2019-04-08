@@ -35,10 +35,10 @@
 
     <groupId>io.manebot</groupId>
     <artifactId>manebot</artifactId>
-    <version>0.1.3.5</version>
+    <version>0.1.3.8</version>
 
     <properties>
-        <apiVersion>0.1.6.8</apiVersion>
+        <apiVersion>0.1.6.11</apiVersion>
 
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>

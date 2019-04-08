@@ -63,6 +63,18 @@ public final class DefaultPluginRegistration implements PluginRegistration {
     }
 
     @Override
+    public void setRequired(boolean required) throws SecurityException {
+        Permission.checkPermission("system.plugin.required.change");
+
+        plugin.setRequired(required);
+    }
+
+    @Override
+    public boolean isRequired() {
+        return plugin.isRequired();
+    }
+
+    @Override
     public Collection<PluginProperty> getProperties() {
         return plugin.getProperties().stream().map(x -> (PluginProperty) x).collect(Collectors.toList());
     }

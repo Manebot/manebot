@@ -41,12 +41,10 @@ public final class JavaPlugin implements Plugin, EventListener {
     private final Collection<Consumer<Plugin>> dependencyListeners;
     private final Collection<PluginFunction> enable;
     private final Collection<PluginFunction> disable;
-    private final Map<Class<? extends PluginReference>,
-            Function<Future, ? extends PluginReference>> instanceMap;
     private final Collection<Database> databases;
     private final Collection<ManifestIdentifier> requiredIdentifiers;
 
-    private final Map<Class<? extends PluginReference>, PluginReference> instances = new LinkedHashMap<>();
+    private final Map<Class<? extends PluginReference>, PluginReference> instances;
     private final Map<String, PlatformRegistration> platforms = new LinkedHashMap<>();
     private final Collection<CommandManager.Registration> registeredCommands = new LinkedList<>();
 
@@ -70,8 +68,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                        Collection<Consumer<Plugin>> dependencyListeners,
                        Collection<PluginFunction> enable,
                        Collection<PluginFunction> disable,
-                       Map<Class<? extends PluginReference>,
-                               Function<Future, ? extends PluginReference>> instanceMap,
+                       Map<Class<? extends PluginReference>, Function<Plugin, ? extends PluginReference>> instanceMap,
                        Collection<Database> databases,
                        Collection<ManifestIdentifier> requiredIdentifiers) {
         this.bot = bot;
@@ -89,13 +86,21 @@ public final class JavaPlugin implements Plugin, EventListener {
         this.dependencyListeners = dependencyListeners;
         this.enable = enable;
         this.disable = disable;
-        this.instanceMap = instanceMap;
         this.databases = databases;
         this.requiredIdentifiers = requiredIdentifiers;
 
         this.logger = Logger.getLogger("Plugin/" + getName());
         logger.setParent(Logger.getGlobal());
         logger.setUseParentHandlers(true);
+
+        this.instances = new LinkedHashMap<>();
+
+        // Register instances
+        for (Class<? extends PluginReference> instanceClass : instanceMap.keySet()) {
+            Function<Plugin, ? extends PluginReference> instantiator = instanceMap.get(instanceClass);
+            PluginReference reference = instantiator.apply(this);
+            instances.put(instanceClass, reference);
+        }
     }
 
     @Override
@@ -307,13 +312,6 @@ public final class JavaPlugin implements Plugin, EventListener {
     }
 
     private void onEnable(Future future) throws PluginException {
-        // Register instances
-        for (Class<? extends PluginReference> instanceClass : instanceMap.keySet()) {
-            Function<Future, ? extends PluginReference> instantiator = instanceMap.get(instanceClass);
-            PluginReference reference = instantiator.apply(future);
-            instances.put(instanceClass, reference);
-        }
-
         // Register & load platforms
         for (Consumer<Platform.Builder> consumer : platformBuilders) {
             PlatformRegistration registration = platformManager.registerPlatform(builder -> {
@@ -330,8 +328,8 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         // Load instances
-        for (Class<? extends PluginReference> instanceClass : instanceMap.keySet())
-            Objects.requireNonNull(getInstance(instanceClass)).load(future);
+        for (PluginReference reference : instances.values())
+            reference.load(future);
 
         // Register all commands
         for (String command : commandExecutors.keySet())
@@ -352,12 +350,8 @@ public final class JavaPlugin implements Plugin, EventListener {
 
     private void onDisable(Future future) {
         // Unregister instances
-        Iterator<Map.Entry<Class<? extends PluginReference>, PluginReference>> instanceIterator =
-                instances.entrySet().iterator();
-        while (instanceIterator.hasNext()) {
-            Map.Entry<Class<? extends PluginReference>, PluginReference> instance = instanceIterator.next();
+        for (Map.Entry<Class<? extends PluginReference>, PluginReference> instance : instances.entrySet()) {
             instance.getValue().unload(future);
-            instanceIterator.remove();
         }
 
         // Unregister commands
@@ -404,7 +398,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         private final Collection<PluginFunction> enable = new LinkedList<>();
         private final Collection<PluginFunction> disable = new LinkedList<>();
         private final Map<String, Function<Future, CommandExecutor>> commandExecutors = new LinkedHashMap<>();
-        private final Map<Class<? extends PluginReference>, Function<Future, ? extends PluginReference>>
+        private final Map<Class<? extends PluginReference>, Function<Plugin, ? extends PluginReference>>
                 instanceMap = new LinkedHashMap<>();
         private final Collection<Database> databases = new LinkedList<>();
         private final Collection<ManifestIdentifier> requiredIdentifiers = new LinkedList<>();
@@ -458,14 +452,34 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public Plugin requirePlugin(ManifestIdentifier manifestIdentifier) throws PluginLoadException {
-            PluginRegistration registration = pluginManager.getPlugin(manifestIdentifier);
-            if (registration == null) throw new IllegalArgumentException(manifestIdentifier.toString());
+        public Plugin getPlugin(ManifestIdentifier identifier) throws PluginLoadException {
+            PluginRegistration registration = pluginManager.getPlugin(identifier);
+            if (registration == null) throw new IllegalArgumentException(identifier.toString());
 
             // Load required dependency (it most likely already is loaded)
-            Plugin plugin = registration.load();
+            return Objects.requireNonNull(registration.load());
+        }
+
+        @Override
+        public Plugin requirePlugin(ManifestIdentifier manifestIdentifier) throws PluginLoadException {
+            Plugin plugin = getPlugin(manifestIdentifier);
+
+            if (!plugin.isEnabled()) {
+                if (!plugin.getRegistration().willAutoStart())
+                    throw new PluginLoadException(
+                            plugin.getArtifact().getIdentifier().toString()
+                                    + " is required but not enabled."
+                    );
+
+                try {
+                    plugin.setEnabled(true);
+                } catch (PluginException e) {
+                    throw new PluginLoadException(e);
+                }
+            }
 
             requiredIdentifiers.add(manifestIdentifier);
+
             return plugin;
         }
 
@@ -488,8 +502,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public <T extends PluginReference>
-        Plugin.Builder setInstance(Class<T> aClass, Function<Future, T> function) {
+        public <T extends PluginReference> Plugin.Builder setInstance(Class<T> aClass, Function<Plugin, T> function) {
             instanceMap.put(aClass, function);
             return this;
         }

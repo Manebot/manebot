@@ -175,26 +175,47 @@ public final class DefaultBot implements Bot, Runnable {
 
             setState(BotState.STARTING);
 
-            for (PluginRegistration plugin : pluginManager.getPlugins()) {
+            for (PluginRegistration registration : pluginManager.getPlugins()) {
                 try {
-                    plugin.load();
+                    registration.load();
                 } catch (PluginLoadException e) {
-                    throw new RuntimeException(e);
+                    if (!registration.isRequired())
+                        Logger.getGlobal().log(
+                                Level.WARNING,
+                                "Problem loading plugin " + registration.getIdentifier(),
+                                e
+                        );
+                    else
+                        throw new RuntimeException(
+                                "Required plugin " +
+                                        registration.getIdentifier() +
+                                        " failed to load",
+                                e
+                        );
                 }
             }
 
             // Start all auto-start plugins
             for (io.manebot.plugin.Plugin plugin : pluginManager.getLoadedPlugins()) {
-                if (plugin.getRegistration() != null && !plugin.getRegistration().willAutoStart()) continue;
+                if (plugin.getRegistration() == null) continue;
+                if (!plugin.getRegistration().willAutoStart()) continue;
 
                 try {
                     plugin.setEnabled(true);
                 } catch (PluginException e) {
-                    Logger.getGlobal().log(
-                            Level.WARNING,
-                            "Problem enabling plugin " + plugin.getArtifact().getIdentifier(),
-                            e
-                    );
+                    if (!plugin.getRegistration().isRequired())
+                        Logger.getGlobal().log(
+                                Level.WARNING,
+                                "Problem enabling plugin " + plugin.getArtifact().getIdentifier(),
+                                e
+                        );
+                    else
+                        throw new RuntimeException(
+                                "Required plugin " +
+                                        plugin.getArtifact().getIdentifier() +
+                                        " failed to enable",
+                                e
+                        );
                 }
             }
 

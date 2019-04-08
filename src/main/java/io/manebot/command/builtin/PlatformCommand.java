@@ -11,12 +11,13 @@ import io.manebot.command.executor.chained.argument.CommandArgumentString;
 import io.manebot.command.response.CommandListResponse;
 import io.manebot.command.search.CommandArgumentSearch;
 import io.manebot.database.Database;
-import io.manebot.database.model.Plugin;
+import io.manebot.database.model.Group;
 import io.manebot.database.search.Search;
 import io.manebot.database.search.SearchHandler;
 import io.manebot.database.search.handler.SearchHandlerPropertyContains;
 import io.manebot.platform.Platform;
 import io.manebot.platform.PlatformManager;
+import io.manebot.plugin.Plugin;
 import io.manebot.plugin.PluginException;
 
 import java.sql.SQLException;
@@ -158,8 +159,9 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
         sender.sendDetails(builder -> {
             builder.name("Platform").key(platform.getId());
 
-            if (platform.getPlugin() != null) {
-                builder.item("Plugin", platform.getPlugin().getArtifact().getIdentifier().toString());
+            Plugin plugin = platform.getPlugin();
+            if (plugin != null) {
+                builder.item("Plugin", plugin.getArtifact().getIdentifier().toString());
             } else {
                 builder.item("Plugin", "(none)");
             }
@@ -169,6 +171,13 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                 builder.item("Connected", Boolean.toString(platform.isConnected()));
             } else {
                 builder.item("Registered", "false");
+            }
+
+            Group group = platform.getDefaultGroup();
+            if (group != null) {
+                builder.item("New user group", group.getName());
+            } else {
+                builder.item("New user group", "(none)");
             }
         });
     }

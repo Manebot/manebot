@@ -6,6 +6,7 @@ import io.manebot.chat.ChatMessage;
 import io.manebot.chat.TextStyle;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
+import io.manebot.platform.Platform;
 
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -20,9 +21,11 @@ public class DefaultUserRegistration implements UserRegistration {
     @Override
     public UserAssociation register(ChatMessage chatMessage) throws CommandExecutionException {
         final String username = chatMessage.getSender().getDisplayName().replace(" ", "");
+        final Platform platform = chatMessage.getSender().getPlatformUser().getPlatform();
 
         UserAssociation association = null;
         String[] arguments = chatMessage.getRawMessage().split(" ", 2);
+
         if ("register".equals(arguments[0].toLowerCase())) {
             String attemptedUsername =
                     (arguments.length == 2 && arguments[1].trim().length() > 0 ? arguments[1] : username)
@@ -75,6 +78,9 @@ public class DefaultUserRegistration implements UserRegistration {
                     throw new CommandArgumentException("Desired username is not alphanumeric.");
 
                 user = bot.getUserManager().createUser(attemptedUsername, UserType.COMMON);
+
+                UserGroup userGroup = platform.getDefaultGroup();
+                if (userGroup != null) user.addGroup(userGroup);
 
                 association = user.createAssociation(
                         chatMessage.getSender().getPlatformUser().getPlatform(),

@@ -311,7 +311,7 @@ public final class JavaPluginLoader implements PluginLoader {
                     plugin = dependencyInstance.getInstance().load();
                 } catch (Throwable e) {
                     PluginLoadException exception = new PluginLoadException(
-                            "Problem loading non-optional plugin dependency " +
+                            "Problem loading plugin dependency " +
                             dependencyInstance.getInstance().getArtifact().getIdentifier() + " for " +
                             artifact.getIdentifier(),
                             e

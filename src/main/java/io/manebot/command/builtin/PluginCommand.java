@@ -86,7 +86,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
     }
 
     private void installDependencies(CommandSender sender, Collection<ArtifactDependency> dependencies)
-            throws ArtifactRepositoryException, PluginLoadException {
+            throws ArtifactRepositoryException, PluginLoadException, CommandExecutionException {
         for (ArtifactDependency dependency : dependencies) {
             if (pluginManager.getPlugin(dependency.getChild().getIdentifier().withoutVersion()) != null)
                 continue;
@@ -113,6 +113,26 @@ public class PluginCommand extends AnnotatedCommandExecutor {
 
             sender.sendMessage("Installing " + dependency.getChild().getIdentifier().toString() + "...");
             sender.flush();
+
+            PluginRegistration registration;
+
+            try {
+                registration = pluginManager.install(dependency.getChild().getIdentifier());
+            } catch (PluginLoadException e) {
+                Virtual.getInstance().currentProcess().getLogger().log(
+                        Level.SEVERE,
+                        "Failed to install " + dependency.getChild().getIdentifier().toString(),
+                        e
+                );
+
+                throw new CommandExecutionException(
+                        "Failed to install " + dependency.getChild().getIdentifier().toString() + ": " + e.getMessage()
+                );
+            }
+
+            registration.setAutoStart(true);
+
+            sender.sendMessage("Installed " + registration.getIdentifier().toString() + ".");
         }
     }
 

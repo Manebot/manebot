@@ -9,7 +9,9 @@ import io.manebot.artifact.aether.AetherArtifactRepository;
 import io.manebot.chat.*;
 import io.manebot.command.*;
 import io.manebot.command.builtin.*;
+import io.manebot.command.exception.CommandAccessException;
 import io.manebot.command.exception.CommandArgumentException;
+import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.conversation.ConversationProvider;
 import io.manebot.conversation.DefaultConversationProvider;
 import io.manebot.database.DatabaseManager;
@@ -24,6 +26,7 @@ import io.manebot.event.EventDispatcher;
 import io.manebot.event.EventHandler;
 import io.manebot.event.EventListener;
 import io.manebot.event.chat.ChatUnknownUserEvent;
+import io.manebot.lambda.ThrowingFunction;
 import io.manebot.log.LineLogFormatter;
 import io.manebot.platform.DefaultPlatformManager;
 import io.manebot.platform.Platform;
@@ -42,6 +45,7 @@ import org.eclipse.aether.repository.RemoteRepository;
 import java.io.*;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -455,8 +459,9 @@ public final class DefaultBot implements Bot, Runnable {
                     bot.platformManager
             );
 
-            SynchronousTransfer<io.manebot.user.User, AsyncCommandShell> shellTransfer =
+            SynchronousTransfer<io.manebot.user.User, AsyncCommandShell, Exception> shellTransfer =
                     new SynchronousTransfer<>(
+                            Exception.class,
                             new AsyncCommandShell.ShellFactory(bot.commandManager, bot.eventDispatcher)
                     );
 
@@ -517,25 +522,38 @@ public final class DefaultBot implements Bot, Runnable {
             user.createAssociation(consolePlatformRegistration.getPlatform(), ConsolePlatformConnection.CONSOLE_UID);
             consolePlatformRegistration.getConnection().connect();
 
-            // registration hook
+            // user registration hook (synchronous transfer queue)
+            SynchronousTransfer<ChatUnknownUserEvent, io.manebot.user.UserAssociation, CommandExecutionException>
+                    registrationTransfer = new SynchronousTransfer<>(CommandExecutionException.class, event -> {
+                ChatMessage message = event.getMessage();
+                ChatSender sender = message.getSender();
+                Chat chat = sender.getChat();
+                Platform platform = chat.getPlatform();
+
+                // See if registration is generally allowed.
+                if (platform != null && !platform.isRegistrationAllowed())
+                    throw new CommandAccessException("User registration is not allowed on this platform.");
+
+                UserRegistration registration = chat.getUserRegistration();
+
+                if (registration == null) registration = bot.getDefaultUserRegistration();
+                if (registration == null) throw new NullPointerException("registration");
+
+                return registration.register(event.getMessage());
+            });
+
+            // run user registration as root
+            Virtual.getInstance().create(registrationTransfer).start();
+
+            // listen to user registration event
             bot.eventManager.registerListener(new EventListener() {
                 @EventHandler
                 public void onUnknownChatUserEvent(ChatUnknownUserEvent event) {
                     ChatMessage message = event.getMessage();
                     ChatSender sender = message.getSender();
-                    Chat chat = sender.getChat();
-                    Platform platform = chat.getPlatform();
-
-                    // See if registration is generally allowed.
-                    if (platform != null && !platform.isRegistrationAllowed()) return;
-
-                    UserRegistration registration = chat.getUserRegistration();
-
-                    if (registration == null) registration = bot.getDefaultUserRegistration();
-                    if (registration == null) throw new NullPointerException("registration");
 
                     try {
-                        io.manebot.user.UserAssociation association = registration.register(event.getMessage());
+                        registrationTransfer.applyChecked(event);
                     } catch (CommandArgumentException e) {
                         sender.sendMessage(
                                 "There was a problem registering: " + e.getMessage()
@@ -550,7 +568,7 @@ public final class DefaultBot implements Bot, Runnable {
                 }
             });
 
-            Logger.getGlobal().info("manebot started successfully.");
+            Logger.getGlobal().info("Manebot " + bot.getVersion().toString() + " started successfully.");
 
             bot.run();
         } catch (Throwable e) {

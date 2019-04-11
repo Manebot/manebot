@@ -13,8 +13,6 @@ import java.util.concurrent.Future;
 import java.util.function.Function;
 
 public class DefaultCommandDispatcher<S extends CommandShell> implements CommandDispatcher {
-    private static final int queueSize = 3;
-
     private final Function<User, S> shellFactory;
     private final EventDispatcher eventDispatcher;
 

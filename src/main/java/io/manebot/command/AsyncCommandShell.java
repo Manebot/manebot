@@ -2,6 +2,7 @@ package io.manebot.command;
 
 import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.event.EventDispatcher;
+import io.manebot.lambda.ThrowingFunction;
 import io.manebot.user.User;
 import io.manebot.virtual.Virtual;
 import io.manebot.virtual.VirtualProcess;
@@ -138,7 +139,7 @@ public class AsyncCommandShell extends AbstractCommandShell implements Runnable 
         }
     }
 
-    public static class ShellFactory implements Function<User, AsyncCommandShell> {
+    public static class ShellFactory implements ThrowingFunction<User, AsyncCommandShell, Exception> {
         private final CommandManager commandManager;
         private final EventDispatcher eventDispatcher;
         private final Map<User, AsyncCommandShell> shells = new LinkedHashMap<>();
@@ -149,7 +150,7 @@ public class AsyncCommandShell extends AbstractCommandShell implements Runnable 
         }
 
         @Override
-        public AsyncCommandShell apply(User user) {
+        public AsyncCommandShell applyChecked(User user) throws Exception {
             AsyncCommandShell shell = shells.computeIfAbsent(user, key -> new AsyncCommandShell(
                     commandManager,
                     eventDispatcher,

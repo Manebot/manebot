@@ -46,6 +46,13 @@ public final class DefaultVirtual extends Virtual {
     }
 
     @Override
+    public User currentUser() {
+        VirtualProcess process = currentProcess();
+        if (process == null) return null;
+        else return process.getUser();
+    }
+
+    @Override
     public Collection<VirtualProcess> getProcesses() {
         return Collections.unmodifiableCollection(processes);
     }

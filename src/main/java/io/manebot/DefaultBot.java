@@ -183,7 +183,7 @@ public final class DefaultBot implements Bot, Runnable {
             for (PluginRegistration registration : pluginManager.getPlugins()) {
                 try {
                     registration.load();
-                } catch (PluginLoadException e) {
+                } catch (Throwable e) {
                     if (!registration.isRequired())
                         Logger.getGlobal().log(
                                 Level.WARNING,
@@ -207,7 +207,7 @@ public final class DefaultBot implements Bot, Runnable {
 
                 try {
                     plugin.setEnabled(true);
-                } catch (PluginException e) {
+                } catch (Throwable e) {
                     if (!plugin.getRegistration().isRequired())
                         Logger.getGlobal().log(
                                 Level.WARNING,

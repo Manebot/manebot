@@ -194,10 +194,16 @@ public final class DefaultPluginManager implements PluginManager {
             });
 
             if (plugin == null) {
+                io.manebot.database.model.Plugin newPlugin =
+                        new io.manebot.database.model.Plugin(
+                                bot.getSystemDatabase(),
+                                artifactIdentifier
+                        );
+
                 final PluginRegistration registration =
                         new DefaultPluginRegistration(
                                 bot,
-                                null,
+                                newPlugin,
                                 this,
                                 artifactIdentifier,
                                 () -> load(artifactIdentifier)
@@ -208,17 +214,7 @@ public final class DefaultPluginManager implements PluginManager {
 
                 try {
                     plugin = bot.getSystemDatabase().executeTransaction(s -> {
-
-                        io.manebot.database.model.Plugin newPlugin =
-                                new io.manebot.database.model.Plugin(
-                                        bot.getSystemDatabase(),
-                                        artifactIdentifier
-                                );
-
                         s.persist(newPlugin);
-
-                        newPlugin.setRegistration(registration);
-
                         return newPlugin;
                     });
                 } catch (SQLException e) {

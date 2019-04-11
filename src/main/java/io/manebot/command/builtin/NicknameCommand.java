@@ -21,7 +21,9 @@ public class NicknameCommand extends AnnotatedCommandExecutor {
     public void info(CommandSender sender, @CommandArgumentString.Argument(label = "nickname") String nickname)
             throws CommandArgumentException {
         String displayName = nickname.trim();
-        checkAlphanumeric(displayName);
+
+        if (!nickname.matches("^[a-zA-Z0-9]+$"))
+            throw new CommandArgumentException("That nickname is not alphanumeric.");
 
         User otherUser = userManager.getUserByDisplayName(displayName);
         if (otherUser != null && !otherUser.getName().equals(sender.getUser().getName()))
@@ -30,17 +32,18 @@ public class NicknameCommand extends AnnotatedCommandExecutor {
         if (sender.getUser().getDisplayName().equals(displayName))
             throw new CommandArgumentException("Your nickname is already \"" + displayName + "\".");
 
+        if (displayName.length() < 3)
+            throw new CommandArgumentException("That nickname is less than 3 characters long.");
+
         if (displayName.length() > 12)
-            throw new CommandArgumentException("That nickname is too long.");
+            throw new CommandArgumentException("That nickname is more than 12 characters long.");
 
         sender.getUser().setDisplayName(displayName);
         sender.sendMessage("You have set your nickname to " + displayName + ".");
     }
 
     private static void checkAlphanumeric(String s) throws CommandArgumentException {
-        for (char c : s.toCharArray())
-            if (!Character.isLetterOrDigit(c))
-                throw new CommandArgumentException("'" + c + "' is not alphanumeric.");
+
     }
 
 

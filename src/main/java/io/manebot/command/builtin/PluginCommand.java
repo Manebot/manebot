@@ -668,7 +668,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         sender.sendMessage(registration.getIdentifier().toString() + " is now required at startup.");
     }
 
-    @Command(description = "Unrequires a plugin", permission = "system.plugin.unrequire")
+    @Command(description = "Unrequires a plugin", permission = "system.plugin.require")
     public void unrequire(CommandSender sender,
                         @CommandArgumentLabel.Argument(label = "unrequire") String unrequire,
                         @CommandArgumentString.Argument(label = "identifier") String identifier)
@@ -690,6 +690,54 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         registration.setRequired(false);
 
         sender.sendMessage(registration.getIdentifier().toString() + " is no longer required at startup.");
+    }
+
+    @Command(description = "Elevates a plugin", permission = "system.plugin.elevate")
+    public void elevate(CommandSender sender,
+                        @CommandArgumentLabel.Argument(label = "elevate") String elevate,
+                        @CommandArgumentString.Argument(label = "identifier") String identifier)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (!registration.isLoaded())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not loaded.");
+
+        if (registration.isElevated())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is already elevated.");
+
+        registration.setElevated(true);
+
+        sender.sendMessage(registration.getIdentifier().toString() + " is now elevated.");
+    }
+
+    @Command(description = "Unelevates a plugin", permission = "system.plugin.elevate")
+    public void unelevate(CommandSender sender,
+                          @CommandArgumentLabel.Argument(label = "unelevate") String unelevate,
+                          @CommandArgumentString.Argument(label = "identifier") String identifier)
+            throws CommandExecutionException {
+        ArtifactIdentifier artifactIdentifier = pluginManager.resolveIdentifier(identifier);
+        if (artifactIdentifier == null)
+            throw new CommandArgumentException("Plugin not found, or no versions are available.");
+
+        PluginRegistration registration = pluginManager.getPlugin(artifactIdentifier.withoutVersion());
+        if (registration == null)
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
+
+        if (!registration.isLoaded())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not loaded.");
+
+        if (!registration.isElevated())
+            throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not required.");
+
+        registration.setElevated(false);
+
+        sender.sendMessage(registration.getIdentifier().toString() + " is no longer elevated.");
     }
 
     @Override

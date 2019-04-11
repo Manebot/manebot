@@ -4,6 +4,7 @@ import io.manebot.security.Permission;
 import io.manebot.user.User;
 
 import java.util.*;
+import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -61,11 +62,14 @@ public final class DefaultVirtual extends Virtual {
     public DefaultVirtualProcess create(Runnable runnable) throws SecurityException {
         Thread currentThread = Thread.currentThread();
         VirtualProcess currentProcess = getProcess(currentThread);
+        return create(currentProcess, runnable);
+    }
 
+    private DefaultVirtualProcess create(VirtualProcess parent, Runnable runnable) {
         return registerProcess(new DefaultVirtualProcess(
-                currentProcess,
+                parent,
                 new Thread(runnable),
-                currentProcess == null ? null : currentProcess.getUser()
+                parent == null ? null : parent.getUser()
         ));
     }
 
@@ -220,6 +224,12 @@ public final class DefaultVirtual extends Virtual {
         @Override
         public Profiler getProfiler() {
             return profiler;
+        }
+
+        @Override
+        public ThreadFactory newThreadFactory() throws SecurityException {
+            if (!isCallerSelf()) throw new SecurityException("caller is not self");
+            return r -> create(DefaultVirtualProcess.this, r).thread;
         }
     }
 

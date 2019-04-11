@@ -14,6 +14,7 @@ import io.manebot.plugin.java.classloader.ClassSource;
 import io.manebot.plugin.java.classloader.LocalClassLoader;
 import io.manebot.plugin.java.classloader.LocalURLClassLoader;
 import io.manebot.plugin.loader.PluginLoader;
+import io.manebot.security.ElevationDispatcher;
 import io.manebot.virtual.Virtual;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
@@ -24,8 +25,10 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -44,6 +47,7 @@ public final class JavaPluginLoader implements PluginLoader {
     private final Map<ManifestIdentifier, JavaPluginInstance> pluginInstances = new LinkedHashMap<>();
 
     private final DefaultArtifactVersion apiVersion;
+    private final Function<ManifestIdentifier, ElevationDispatcher> elevationDispatcherFunction;
 
     public JavaPluginLoader(Bot bot,
                             PluginManager pluginManager,
@@ -51,7 +55,8 @@ public final class JavaPluginLoader implements PluginLoader {
                             CommandManager commandManager,
                             PlatformManager platformManager,
                             EventManager eventManager,
-                            DefaultArtifactVersion apiVersion) {
+                            DefaultArtifactVersion apiVersion,
+                            Function<ManifestIdentifier, ElevationDispatcher> elevationDispatcherFunction) {
         this.bot = bot;
 
         this.pluginManager = pluginManager;
@@ -60,6 +65,7 @@ public final class JavaPluginLoader implements PluginLoader {
         this.platformManager = platformManager;
         this.eventManager = eventManager;
         this.apiVersion = apiVersion;
+        this.elevationDispatcherFunction = elevationDispatcherFunction;
     }
 
     /**
@@ -396,7 +402,8 @@ public final class JavaPluginLoader implements PluginLoader {
                     databaseManager,
                     eventManager,
                     artifact,
-                    pluginDependencies
+                    pluginDependencies,
+                    () -> elevationDispatcherFunction.apply(artifact.getIdentifier().withoutVersion())
             );
 
             try {

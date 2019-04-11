@@ -26,7 +26,6 @@ import io.manebot.event.EventDispatcher;
 import io.manebot.event.EventHandler;
 import io.manebot.event.EventListener;
 import io.manebot.event.chat.ChatUnknownUserEvent;
-import io.manebot.lambda.ThrowingFunction;
 import io.manebot.log.LineLogFormatter;
 import io.manebot.platform.DefaultPlatformManager;
 import io.manebot.platform.Platform;
@@ -36,6 +35,8 @@ import io.manebot.plugin.DefaultPluginManager;
 import io.manebot.plugin.PluginException;
 import io.manebot.plugin.PluginLoadException;
 import io.manebot.plugin.PluginRegistration;
+import io.manebot.security.DefaultElevationDispatcher;
+import io.manebot.security.ElevationDispatcher;
 import io.manebot.user.*;
 import io.manebot.virtual.DefaultVirtual;
 import io.manebot.virtual.SynchronousTransfer;
@@ -44,8 +45,8 @@ import org.eclipse.aether.repository.RemoteRepository;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -449,14 +450,21 @@ public final class DefaultBot implements Bot, Runnable {
 
             logger.info("Logged in as " + user.getName() + ".");
 
-            Virtual.setInstance(new DefaultVirtual(user));
+            DefaultVirtual virtual;
+            Virtual.setInstance(virtual = new DefaultVirtual(user));
+
+            ElevationDispatcher elevationDispatcher = new DefaultElevationDispatcher(
+                    user,
+                    Executors.newCachedThreadPool(virtual.currentProcess().newThreadFactory())
+            );
 
             bot.pluginManager = new DefaultPluginManager(
                     bot,
                     bot.eventManager,
                     bot.databaseManager,
                     bot.commandManager,
-                    bot.platformManager
+                    bot.platformManager,
+                    elevationDispatcher
             );
 
             SynchronousTransfer<io.manebot.user.User, AsyncCommandShell, Exception> shellTransfer =

@@ -70,7 +70,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
             throws CommandExecutionException {
         Function<String, Entity>  entityFunction = createEntityAccessor(entityType);
         Entity entity = entityFunction.apply(entityName);
-        entity.getPropery(name).set(Base64.getDecoder().decode(base64));
+        entity.getProperty(name).set(Base64.getDecoder().decode(base64));
         sender.sendMessage("Property set.");
     }
 
@@ -83,7 +83,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
             throws CommandExecutionException {
         Function<String, Entity> entityFunction = createEntityAccessor(entityType);
         Entity entity = entityFunction.apply(entityName);
-        Property property = entity.getPropery(name);
+        Property property = entity.getProperty(name);
         if (property.isNull())
             sender.sendMessage(property.getName() + " => (null)");
         else
@@ -99,7 +99,7 @@ public class PropertyCommand extends AnnotatedCommandExecutor {
             throws CommandExecutionException {
         Function<String, Entity>  entityFunction = createEntityAccessor(entityType);
         Entity entity = entityFunction.apply(entityName);
-        Property property = entity.getPropery(name);
+        Property property = entity.getProperty(name);
         if (property.isNull())
             throw new CommandArgumentException("Property is already null");
         else {

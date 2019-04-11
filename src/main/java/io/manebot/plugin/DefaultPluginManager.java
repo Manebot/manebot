@@ -12,6 +12,7 @@ import io.manebot.platform.PlatformManager;
 import io.manebot.plugin.java.JavaPluginLoader;
 import io.manebot.plugin.loader.PluginLoader;
 import io.manebot.plugin.loader.PluginLoaderRegistry;
+import io.manebot.security.ElevationDispatcher;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 import java.io.FileNotFoundException;
@@ -39,6 +40,8 @@ public final class DefaultPluginManager implements PluginManager {
     private final PluginLoaderRegistry pluginLoaderRegistry;
     private final DefaultBot bot;
 
+    private final ElevationDispatcher elevationDispatcher;
+
     private final Set<Plugin> plugins = new HashSet<>();
     private final Map<ManifestIdentifier, PluginRegistration> pluginMap = new LinkedHashMap<>();
     private final Map<PluginRegistration, io.manebot.database.model.Plugin> modelMap
@@ -50,10 +53,12 @@ public final class DefaultPluginManager implements PluginManager {
                                 EventManager eventManager,
                                 DatabaseManager databaseManager,
                                 CommandManager commandManager,
-                                PlatformManager platformManager
-    ) {
+                                PlatformManager platformManager,
+                                ElevationDispatcher elevationDispatcher) {
         this.bot = bot;
+        this.elevationDispatcher = elevationDispatcher;
         this.pluginLoaderRegistry = new PluginLoaderRegistry();
+
         this.pluginLoaderRegistry.registerLoader("jar",
                 new JavaPluginLoader(
                         bot,
@@ -62,7 +67,8 @@ public final class DefaultPluginManager implements PluginManager {
                         commandManager,
                         platformManager,
                         eventManager,
-                        bot.getApiVersion() == null ? null : new DefaultArtifactVersion(bot.getApiVersion().toString())
+                        bot.getApiVersion() == null ? null : new DefaultArtifactVersion(bot.getApiVersion().toString()),
+                        this::getElevationDispatcher
                 )
         );
     }
@@ -92,6 +98,12 @@ public final class DefaultPluginManager implements PluginManager {
                     .findFirst()
                     .orElse(null);
         }));
+    }
+
+    private ElevationDispatcher getElevationDispatcher(ManifestIdentifier manifestIdentifier) {
+        PluginRegistration registration = getPlugin(manifestIdentifier);
+        if (registration == null) return null;
+        else return registration.isElevated() ? elevationDispatcher : null;
     }
 
     private PluginRegistration getOrLoadRegistration(io.manebot.database.model.Plugin plugin) {

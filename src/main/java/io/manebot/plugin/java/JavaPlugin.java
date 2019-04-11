@@ -11,12 +11,13 @@ import io.manebot.database.DatabaseManager;
 import io.manebot.event.EventListener;
 import io.manebot.event.EventManager;
 import io.manebot.platform.Platform;
-import io.manebot.platform.PlatformConnection;
 import io.manebot.platform.PlatformManager;
 import io.manebot.platform.PlatformRegistration;
 import io.manebot.plugin.*;
+import io.manebot.security.ElevationDispatcher;
 
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -35,6 +36,9 @@ public final class JavaPlugin implements Plugin, EventListener {
     private final Artifact artifact;
 
     private final Map<ManifestIdentifier, Plugin> dependencyMap;
+
+    private final Callable<ElevationDispatcher> elevationDispatcher;
+
     private final Collection<Consumer<Platform.Builder>> platformBuilders;
     private final Map<String, Function<Future, CommandExecutor>> commandExecutors;
     private final Collection<EventListener> eventListeners;
@@ -62,6 +66,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                        EventManager eventManager,
                        Artifact artifact,
                        Map<ManifestIdentifier, Plugin> dependencyMap,
+                       Callable<ElevationDispatcher> elevationDispatcher,
                        Collection<Consumer<Platform.Builder>> platformBuilders,
                        Map<String, Function<Future, CommandExecutor>> commandExecutors,
                        Collection<EventListener> eventListeners,
@@ -80,6 +85,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         this.eventManager = eventManager;
         this.artifact = artifact;
         this.dependencyMap = dependencyMap;
+        this.elevationDispatcher = elevationDispatcher;
         this.platformBuilders = platformBuilders;
         this.commandExecutors = commandExecutors;
         this.eventListeners = eventListeners;
@@ -217,11 +223,19 @@ public final class JavaPlugin implements Plugin, EventListener {
         return Collections.unmodifiableCollection(dependencyListeners);
     }
 
+    private Future createFuture() {
+        try {
+            return new Future(getRegistration(), elevationDispatcher.call());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override
     public final boolean setEnabled(boolean enabled) throws PluginException {
         synchronized (enableLock) {
             if (this.enabled != enabled) {
-                Future future = new Future(getRegistration());
+                Future future = createFuture();
 
                 if (enabled) {
                     for (Map.Entry<ManifestIdentifier, Plugin> dependencyMap : dependencyMap.entrySet()) {
@@ -247,7 +261,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                         this.enabled = false;
 
                         try {
-                            Future unloadFuture = new Future(getRegistration());
+                            Future unloadFuture = createFuture();
                             onDisable(unloadFuture);
                             for (Consumer<PluginRegistration> after : unloadFuture.getTasks())
                                 after.accept(getRegistration());
@@ -391,6 +405,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         private final EventManager eventManager;
         private final Artifact artifact;
         private final Map<ManifestIdentifier, Plugin> dependencyMap;
+        private final Callable<ElevationDispatcher> elevationDispatcher;
 
         private final Collection<Consumer<Platform.Builder>> platformBuilders = new LinkedList<>();
         private final Collection<EventListener> eventListeners = new LinkedList<>();
@@ -413,7 +428,8 @@ public final class JavaPlugin implements Plugin, EventListener {
                        DatabaseManager databaseManager,
                        EventManager eventManager,
                        Artifact artifact,
-                       Map<ManifestIdentifier, Plugin> dependencyMap) {
+                       Map<ManifestIdentifier, Plugin> dependencyMap,
+                       Callable<ElevationDispatcher> elevationDispatcher) {
             this.bot = bot;
             this.instance = instance;
             this.platformManager = platformManager;
@@ -423,6 +439,7 @@ public final class JavaPlugin implements Plugin, EventListener {
             this.eventManager = eventManager;
             this.artifact = artifact;
             this.dependencyMap = dependencyMap;
+            this.elevationDispatcher = elevationDispatcher;
         }
 
         @Override
@@ -546,6 +563,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                     eventManager,
                     artifact,
                     dependencyMap,
+                    elevationDispatcher,
                     platformBuilders,
                     commandExecutors,
                     eventListeners,

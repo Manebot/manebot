@@ -3,6 +3,8 @@ package io.manebot.plugin;
 import io.manebot.Bot;
 import io.manebot.artifact.ArtifactIdentifier;
 import io.manebot.security.Permission;
+import io.manebot.user.UserType;
+import io.manebot.virtual.Virtual;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -72,6 +74,20 @@ public final class DefaultPluginRegistration implements PluginRegistration {
     @Override
     public boolean isRequired() {
         return plugin.isRequired();
+    }
+
+    @Override
+    public void setElevated(boolean elevated) throws SecurityException {
+        Permission.checkPermission("system.plugin.elevated.change");
+        if (Virtual.getInstance().currentUser().getType() != UserType.SYSTEM)
+            throw new SecurityException("Cannot change property as non-system user.");
+
+        plugin.setElevated(true);
+    }
+
+    @Override
+    public boolean isElevated() {
+        return plugin.isElevated();
     }
 
     @Override

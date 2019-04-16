@@ -14,11 +14,11 @@ Do you have a community, such a Discord server, Skype group, IRC, and/or Teamspe
 
 **Supported platforms**
 
-| **Platform** 	| **Supported Features**                                                                                                                                    	| **Installation**         	|
-|--------------	|-----------------------------------------------------------------------------------------------------------------------------------------------------------	|--------------------------	|
-| Discord      	| * Discord user system * Automatic user registration * Embeds and rich text * Direct or private text channels * Guild text channels * Guild voice channels 	| `plugin install discord` 	|
-| Teamspeak 3  	| Coming soon: text and audio support                                                                                                                       	| `plugin install ts3`     	|
-| Slack        	| Coming soon: full text support                                                                                                                            	| `plugin install slack`   	|
+| **Platform** 	| **Supported Features**              	| **Installation**         	|
+|--------------	|-------------------------------------	|--------------------------	|
+| Discord      	| Full text and audio support         	| `plugin install discord` 	|
+| Teamspeak 3  	| Coming soon: text and audio support 	| `plugin install ts3`     	|
+| Slack        	| Coming soon: full text support      	| `plugin install slack`   	|
 
 ### Developers
 

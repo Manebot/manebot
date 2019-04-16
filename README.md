@@ -12,6 +12,14 @@ Do you have a community, such a Discord server, Skype group, IRC, and/or Teamspe
 
 **Docker image**: https://hub.docker.com/r/manevolent/manebot
 
+**Supported platforms**
+
+| **Platform** 	| **Supported Features**                                                                                                                                    	| **Installation**         	|
+|--------------	|-----------------------------------------------------------------------------------------------------------------------------------------------------------	|--------------------------	|
+| Discord      	| * Discord user system * Automatic user registration * Embeds and rich text * Direct or private text channels * Guild text channels * Guild voice channels 	| `plugin install discord` 	|
+| Teamspeak 3  	| Coming soon: text and audio support                                                                                                                       	| `plugin install ts3`     	|
+| Slack        	| Coming soon: full text support                                                                                                                            	| `plugin install slack`   	|
+
 ### Developers
 
 You can avoid tracking multiple code-streams for each of your bot's platforms, and centralize your codebase in one place by rebasing to Manebot. You can also bring your bots into other platforms you haven't developed for yet by building your next bot on Manebot. When you use Manebot, your features are immediately available in the entire universe of supported platforms.

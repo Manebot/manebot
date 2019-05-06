@@ -552,6 +552,18 @@ public final class JavaPlugin implements Plugin, EventListener {
             return this;
         }
 
+        @Override
+        public ElevationDispatcher getElevation() {
+            try {
+                return elevationDispatcher.call();
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "Problem obtaining elevation dispatcher for plugin " + getArtifact().toString(),
+                        e
+                );
+            }
+        }
+
         public JavaPlugin build() {
             return new JavaPlugin(
                     bot,

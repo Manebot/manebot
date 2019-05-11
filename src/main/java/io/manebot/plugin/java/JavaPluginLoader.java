@@ -341,7 +341,11 @@ public final class JavaPluginLoader implements PluginLoader {
                         plugin
                 );
 
-                dependencyInstance.getInstance().addDepender(dependencyInstance);
+                dependencyInstance.getInstance().addDepender(new JavaPluginDependency(
+                        javaPluginInstance, // swap instance of the plugin out to that
+                        dependencyInstance.getMinimumVersion(),
+                        dependencyInstance.getArtifactDependency()
+                ));
             }
 
             // Load plugin on a separate thread so that setContextClassLoader() works appropriately.

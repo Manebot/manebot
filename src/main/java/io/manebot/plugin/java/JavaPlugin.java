@@ -539,7 +539,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         @Override
         public Database addDatabase(String s, Consumer<Database.ModelConstructor> consumer) {
             Database database = databaseManager.defineDatabase(
-                    getArtifact().getIdentifier().withoutVersion().toString() + "_" + s,
+                    getArtifact().getIdentifier().withoutVersion().toString().replace(".", "_") + "_" + s,
                     consumer
             );
 

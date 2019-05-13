@@ -38,7 +38,7 @@
     <version>0.1.3.19</version>
 
     <properties>
-        <apiVersion>0.1.6.23</apiVersion>
+        <apiVersion>0.1.6.24</apiVersion>
 
         <hibernateVersion>5.4.1.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>

@@ -1,10 +1,8 @@
 package io.manebot.command.builtin;
 
+import io.manebot.Bot;
 import io.manebot.Version;
-import io.manebot.artifact.ArtifactDependency;
-import io.manebot.artifact.ArtifactIdentifier;
-import io.manebot.artifact.ArtifactRepositoryException;
-import io.manebot.artifact.ManifestIdentifier;
+import io.manebot.artifact.*;
 import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
@@ -15,13 +13,12 @@ import io.manebot.command.executor.chained.argument.CommandArgumentPage;
 import io.manebot.command.executor.chained.argument.CommandArgumentString;
 import io.manebot.command.search.CommandArgumentSearch;
 import io.manebot.database.Database;
-import io.manebot.database.model.User;
 import io.manebot.database.search.Search;
 import io.manebot.database.search.SearchHandler;
-import io.manebot.database.search.SearchOperator;
 import io.manebot.database.search.handler.*;
 import io.manebot.platform.Platform;
 import io.manebot.plugin.*;
+import io.manebot.tuple.Pair;
 import io.manebot.virtual.Virtual;
 
 import java.sql.SQLException;
@@ -32,11 +29,13 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class PluginCommand extends AnnotatedCommandExecutor {
+    private final Bot bot;
     private final PluginManager pluginManager;
 
     private final SearchHandler<io.manebot.database.model.Plugin> searchHandler;
 
-    public PluginCommand(PluginManager pluginManager, Database database) {
+    public PluginCommand(Bot bot, PluginManager pluginManager, Database database) {
+        this.bot = bot;
         this.pluginManager = pluginManager;
         this.searchHandler = database
                 .createSearchHandler(io.manebot.database.model.Plugin.class)
@@ -136,42 +135,40 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         }
     }
 
+    private void update(CommandSender sender, Collection<PluginRegistration> registrations)
+            throws CommandExecutionException {
+        sender.sendMessage("Updating plugin(s)...");
+        sender.flush();
+
+        Collection<ArtifactIdentifier> updates = new Updater(registrations).check();
+
+        if (updates.size() <= 0) {
+            throw new CommandArgumentException("No updates found.");
+        }
+
+        sender.getUser().prompt(builder -> builder
+                .setName("Plugin updates")
+                .setDescription("[" +
+                        updates.stream().map(ManifestIdentifier::toString).collect(Collectors.joining(",")) +
+                        "] have available updates; confirm to mark the plugin(s) for update on the next restart.")
+                .setCallback((prompt) -> {
+                    updates.forEach(identifier ->
+                            pluginManager.getPlugin(identifier).setVersion(identifier.getVersion())
+                    );
+
+                    sender.sendMessage("[" +
+                            updates.stream().map(ManifestIdentifier::toString).collect(Collectors.joining(",")) +
+                            "] have been marked to update; restart Manebot to obtain the new plugin version(s)."
+                    );
+                })
+        );
+    }
+
     @Command(description = "Updates plugins", permission = "system.plugin.update")
     public void update(CommandSender sender,
                        @CommandArgumentLabel.Argument(label = "update") String update)
-            throws CommandExecutionException, ArtifactRepositoryException, PluginLoadException {
-        Collection<ManifestIdentifier> pendingUpdates = new ArrayList<>();
-
-        for (Plugin plugin : pluginManager.getLoadedPlugins()) {
-            ArtifactIdentifier artifactIdentifier = plugin.getArtifact().getIdentifier();
-            ArtifactIdentifier latest = pluginManager.getRepostiory()
-                    .getManifest(artifactIdentifier.withoutVersion())
-                    .getLatestVersion();
-
-            if (latest == null) continue;
-
-            if (Version.fromString(latest.getVersion()).compareTo(
-                    Version.fromString(artifactIdentifier.getVersion())
-            ) <= 0)
-                continue;
-
-            if (pendingUpdates.size() <= 0){
-                sender.sendMessage("Updating plugins...");
-                sender.flush();
-            }
-
-            plugin.getRegistration().setVersion(latest.getVersion());
-            pendingUpdates.add(plugin.getArtifact().getIdentifier().withoutVersion());
-        }
-
-        if (pendingUpdates.size() > 0)
-            sender.sendMessage(
-                    "[" + String.join(",",
-                            pendingUpdates.stream().map(ManifestIdentifier::toString).collect(Collectors.toList())) + "]"
-                            + " have been marked to update; restart to obtain the new plugin version(s)."
-            );
-        else
-            throw new CommandArgumentException("No updates found for installed plugins.");
+            throws CommandExecutionException {
+        update(sender, pluginManager.getPlugins());
     }
 
     @Command(description = "Updates a plugin", permission = "system.plugin.update")
@@ -187,23 +184,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         if (registration == null)
             throw new CommandArgumentException(artifactIdentifier.withoutVersion().toString() + " is not installed.");
 
-        sender.sendMessage("Updating " + artifactIdentifier.toString() + "...");
-        sender.flush();
-
-        ArtifactIdentifier latest = pluginManager.getRepostiory()
-                .getManifest(artifactIdentifier.withoutVersion())
-                .getLatestVersion();
-
-        if (Version.fromString(latest.getVersion()).compareTo(Version.fromString(artifactIdentifier.getVersion())) <= 0)
-            throw new CommandArgumentException("No updates are available for " + artifactIdentifier + ".");
-
-        registration.setVersion(latest.getVersion());
-
-        sender.sendMessage(
-                registration.getIdentifier().toString()
-                + " has been marked to update to version " +
-                latest.getVersion() + "; restart to obtain the new plugin."
-        );
+        update(sender, Collections.singleton(registration));
     }
 
     @Command(description = "Installs a plugin", permission = "system.plugin.install")
@@ -743,5 +724,99 @@ public class PluginCommand extends AnnotatedCommandExecutor {
     @Override
     public String getDescription() {
         return "Manages plugins";
+    }
+
+    private class Updater {
+        private final ArtifactIdentifier coreIdentifier = new ArtifactIdentifier(
+                "io.manebot", "manebot-core",
+                bot.getApiVersion().toString()
+        );
+
+        /**
+         * Collection of plugins to check for updates against
+         */
+        private final Collection<PluginRegistration> plugins;
+
+        private Updater(Collection<PluginRegistration> plugins) {
+            this.plugins = plugins;
+        }
+
+        public Version latest(Artifact artifact, Map<ManifestIdentifier, Version> latestCapableVersions) {
+            PluginRegistration registration = pluginManager.getPlugin(artifact.getIdentifier().withoutVersion());
+            if (registration == null) return null;
+
+            return latestCapableVersions.computeIfAbsent(
+                    artifact.getIdentifier().withoutVersion(),
+                    (key) -> artifact.getManifest().getVersions().stream()
+                            .map(Version::fromString)
+                            .filter(version -> version.compareTo(Version.fromString(artifact.getVersion())) > 0)
+                            .sorted(Comparator.comparing((Version version) -> version).reversed())
+                            .map(version -> {
+                                try {
+                                    return artifact.getManifest().getArtifact(version.toString());
+                                } catch (ArtifactNotFoundException e) {
+                                    return null;
+                                }
+                            })
+                            .filter(Objects::nonNull)
+                            .filter(candidateArtifact -> {
+                                try {
+                                    return candidateArtifact.getDependencyGraph().stream()
+                                            .filter(dependency ->
+                                                    dependency.getType() == ArtifactDependencyLevel.PROVIDED)
+                                            .allMatch(dependency -> {
+                                                if (dependency.getChild().getIdentifier()
+                                                        .withoutVersion().equals(coreIdentifier.withoutVersion())) {
+                                                    return Version.fromString(dependency.getChild().getVersion())
+                                                            .compareTo(Version.fromString(coreIdentifier.getVersion()))
+                                                            <= 0;
+                                                } else {
+                                                    Version latest =
+                                                            latest(dependency.getChild(), latestCapableVersions);
+
+                                                    return latest != null && latest.compareTo(
+                                                            Version.fromString(dependency.getChild().getVersion())
+                                                    ) >= 0;
+                                                }
+                                            });
+                                } catch (ArtifactNotFoundException e) {
+                                    return false;
+                                }
+                            })
+                            .map(candidateArtifact -> Version.fromString(candidateArtifact.getVersion()))
+                            .findFirst()
+                            .orElse(null)
+            );
+        }
+
+        /**
+         * Checks for updates to the previously specified plugins.
+         * @return collection of artifact identifiers that should be updated to.
+         */
+        public Collection<ArtifactIdentifier> check() {
+            final Map<ManifestIdentifier, Version> latestCapableVersions = new LinkedHashMap<>();
+
+            plugins.stream().map(registration -> {
+                if (registration.isLoaded())
+                    return registration.getInstance().getArtifact();
+                else {
+                    try {
+                        return pluginManager.getRepostiory().getArtifact(registration.getIdentifier());
+                    } catch (ArtifactRepositoryException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }).forEach(artifact -> latest(artifact, latestCapableVersions));
+
+            return latestCapableVersions.entrySet().stream()
+                    .filter(entry -> entry.getValue().compareTo(
+                            Version.fromString(pluginManager.getPlugin(entry.getKey()).getIdentifier().getVersion())
+                    ) < 0)
+                    .map(entry -> new ArtifactIdentifier(
+                            entry.getKey().getPackageId(),
+                            entry.getKey().getArtifactId(),
+                            entry.getValue().toString())
+                    ).collect(Collectors.toList());
+        }
     }
 }

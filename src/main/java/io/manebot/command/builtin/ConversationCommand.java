@@ -100,6 +100,11 @@ public class ConversationCommand extends AnnotatedCommandExecutor {
         sender.sendDetails(builder -> {
             builder.name("Conversation").key(conversation.getId());
             builder.item("Platform", conversation.getPlatform().getId());
+            builder.item("Community", conversation.getChat().getCommunity() != null ?
+                    (conversation.getChat().getCommunity().getName() +
+                            " (" + conversation.getChat().getCommunity().getId() + ")")
+                    : "(none)"
+            );
             builder.item("Connected", Boolean.toString(conversation.isConnected()));
         });
     }

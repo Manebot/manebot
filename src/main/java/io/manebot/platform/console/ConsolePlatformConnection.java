@@ -122,6 +122,21 @@ public class ConsolePlatformConnection implements PlatformConnection {
         return Collections.singletonList(CONSOLE_CHAT_ID);
     }
 
+    @Override
+    public Collection<String> getCommunityIds() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Collection<Community> getCommunities() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public Community getCommunity(String id) {
+        return null;
+    }
+
     private class ConsoleUser implements PlatformUser {
         @Override
         public Platform getPlatform() {
@@ -193,6 +208,11 @@ public class ConsolePlatformConnection implements PlatformConnection {
         @Override
         public void addMember(String s) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Community getCommunity() {
+            return null;
         }
 
         @Override

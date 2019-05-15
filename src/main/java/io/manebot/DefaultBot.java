@@ -488,7 +488,7 @@ public final class DefaultBot implements Bot, Runnable {
                     new RunasCommand(bot.userManager, bot.commandDispatcher)).alias("as");
             bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager)).alias("h");
             bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
-            bot.commandManager.registerExecutor("plugin", new PluginCommand(bot.pluginManager, bot.systemDatabase));
+            bot.commandManager.registerExecutor("plugin", new PluginCommand(bot, bot.pluginManager, bot.systemDatabase));
             bot.commandManager.registerExecutor("version", new VersionCommand(bot)).alias("ver");
             bot.commandManager.registerExecutor("platform",
                     new PlatformCommand(bot.userManager, bot.platformManager, bot.systemDatabase));

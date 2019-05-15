@@ -3,6 +3,7 @@ package io.manebot;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.manebot.artifact.ArtifactIdentifier;
 import io.manebot.artifact.ArtifactRepository;
 import io.manebot.artifact.Repositories;
 import io.manebot.artifact.aether.AetherArtifactRepository;
@@ -54,9 +55,12 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public final class DefaultBot implements Bot, Runnable {
-    private static final Version version = BuildInformation.getVersion() == null ?
-            null :
-            Version.fromString(BuildInformation.getVersion());
+    private static final Version version = Objects.requireNonNull(Version.fromString(BuildInformation.getVersion()));
+
+    private static final ArtifactIdentifier identifier = new ArtifactIdentifier(
+            "io.manebot", "manebot",
+            Objects.requireNonNull(version).toString()
+    );
 
     private static final Version apiVersion =
             BuildInformation.getApiVersion() == null ?
@@ -281,6 +285,11 @@ public final class DefaultBot implements Bot, Runnable {
     @Override
     public Version getVersion() {
         return version;
+    }
+
+    @Override
+    public ArtifactIdentifier getIdentifier() {
+        return identifier;
     }
 
     @Override

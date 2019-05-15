@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class PluginCommand extends AnnotatedCommandExecutor {
     private final Bot bot;
     private final PluginManager pluginManager;
+    private final ArtifactIdentifier coreIdentifier;
 
     private final SearchHandler<io.manebot.database.model.Plugin> searchHandler;
 
@@ -44,6 +45,11 @@ public class PluginCommand extends AnnotatedCommandExecutor {
                 .command("disabled", new SearchHandlerPropertyEquals("enabled", Boolean::parseBoolean).not())
                 .sort("name", "artifactId")
                 .build();
+
+        this.coreIdentifier = new ArtifactIdentifier(
+                "io.manebot", "manebot-core",
+                bot.getApiVersion().toString()
+        );
     }
 
     @Command(description = "Searches plugins", permission = "system.plugin.search")
@@ -149,16 +155,14 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         sender.getUser().prompt(builder -> builder
                 .setName("Plugin updates")
                 .setDescription("[" +
-                        updates.stream().map(ManifestIdentifier::toString).collect(Collectors.joining(",")) +
+                        updates.stream()
+                                .map(ArtifactIdentifier::withoutVersion)
+                                .map(ManifestIdentifier::toString)
+                                .collect(Collectors.joining(", ")) +
                         "] have available updates; confirm to mark the plugin(s) for update on the next restart.")
                 .setCallback((prompt) -> {
                     updates.forEach(identifier ->
-                            pluginManager.getPlugin(identifier).setVersion(identifier.getVersion())
-                    );
-
-                    sender.sendMessage("[" +
-                            updates.stream().map(ManifestIdentifier::toString).collect(Collectors.joining(",")) +
-                            "] have been marked to update; restart Manebot to obtain the new plugin version(s)."
+                            pluginManager.getPlugin(identifier.withoutVersion()).setVersion(identifier.getVersion())
                     );
                 })
         );
@@ -727,11 +731,6 @@ public class PluginCommand extends AnnotatedCommandExecutor {
     }
 
     private class Updater {
-        private final ArtifactIdentifier coreIdentifier = new ArtifactIdentifier(
-                "io.manebot", "manebot-core",
-                bot.getApiVersion().toString()
-        );
-
         /**
          * Collection of plugins to check for updates against
          */
@@ -742,51 +741,60 @@ public class PluginCommand extends AnnotatedCommandExecutor {
         }
 
         public Version latest(Artifact artifact, Map<ManifestIdentifier, Version> latestCapableVersions) {
-            PluginRegistration registration = pluginManager.getPlugin(artifact.getIdentifier().withoutVersion());
-            if (registration == null) return null;
+            ManifestIdentifier checkedManifestIdentifier = artifact.getIdentifier().withoutVersion();
 
-            return latestCapableVersions.computeIfAbsent(
-                    artifact.getIdentifier().withoutVersion(),
-                    (key) -> artifact.getManifest().getVersions().stream()
-                            .map(Version::fromString)
-                            .filter(version -> version.compareTo(Version.fromString(artifact.getVersion())) > 0)
-                            .sorted(Comparator.comparing((Version version) -> version).reversed())
-                            .map(version -> {
-                                try {
-                                    return artifact.getManifest().getArtifact(version.toString());
-                                } catch (ArtifactNotFoundException e) {
-                                    return null;
-                                }
-                            })
-                            .filter(Objects::nonNull)
-                            .filter(candidateArtifact -> {
-                                try {
-                                    return candidateArtifact.getDependencyGraph().stream()
-                                            .filter(dependency ->
-                                                    dependency.getType() == ArtifactDependencyLevel.PROVIDED)
-                                            .allMatch(dependency -> {
-                                                if (dependency.getChild().getIdentifier()
-                                                        .withoutVersion().equals(coreIdentifier.withoutVersion())) {
-                                                    return Version.fromString(dependency.getChild().getVersion())
-                                                            .compareTo(Version.fromString(coreIdentifier.getVersion()))
-                                                            <= 0;
-                                                } else {
-                                                    Version latest =
-                                                            latest(dependency.getChild(), latestCapableVersions);
+            PluginRegistration registration = pluginManager.getPlugin(checkedManifestIdentifier);
+            if (registration == null) {
+                return null;
+            }
 
-                                                    return latest != null && latest.compareTo(
-                                                            Version.fromString(dependency.getChild().getVersion())
-                                                    ) >= 0;
-                                                }
-                                            });
-                                } catch (ArtifactNotFoundException e) {
-                                    return false;
-                                }
-                            })
-                            .map(candidateArtifact -> Version.fromString(candidateArtifact.getVersion()))
-                            .findFirst()
-                            .orElse(null)
-            );
+            Version latestVersion = latestCapableVersions.get(checkedManifestIdentifier);
+
+            if (latestVersion == null)
+                latestCapableVersions.put(
+                        checkedManifestIdentifier,
+                        latestVersion = artifact.getManifest().getVersions().stream()
+                                .map(Version::fromString)
+                                .filter(version -> version.compareTo(Version.fromString(artifact.getVersion())) > 0)
+                                .sorted(Comparator.comparing((Version version) -> version).reversed())
+                                .map(version -> {
+                                    try {
+                                        return artifact.getManifest().getArtifact(version.toString());
+                                    } catch (ArtifactNotFoundException e) {
+                                        return null;
+                                    }
+                                })
+                                .filter(Objects::nonNull)
+                                .filter(candidateArtifact -> {
+                                    try {
+                                        return candidateArtifact.getDependencies().stream()
+                                                .filter(dependency ->
+                                                        dependency.getType() == ArtifactDependencyLevel.PROVIDED)
+                                                .allMatch(dependency -> {
+                                                    if (dependency.getChild().getIdentifier()
+                                                            .withoutVersion().equals(coreIdentifier.withoutVersion())) {
+                                                        return Version.fromString(dependency.getChild().getVersion())
+                                                                .compareTo(Version.fromString(coreIdentifier.getVersion()))
+                                                                <= 0;
+                                                    } else {
+                                                        Version latest =
+                                                                latest(dependency.getChild(), latestCapableVersions);
+
+                                                        return latest != null && latest.compareTo(
+                                                                Version.fromString(dependency.getChild().getVersion())
+                                                        ) >= 0;
+                                                    }
+                                                });
+                                    } catch (ArtifactNotFoundException e) {
+                                        return false;
+                                    }
+                                })
+                                .map(candidateArtifact -> Version.fromString(candidateArtifact.getVersion()))
+                                .findFirst()
+                                .orElse(Version.fromString(registration.getIdentifier().getVersion()))
+                );
+
+            return latestVersion;
         }
 
         /**
@@ -811,7 +819,7 @@ public class PluginCommand extends AnnotatedCommandExecutor {
             return latestCapableVersions.entrySet().stream()
                     .filter(entry -> entry.getValue().compareTo(
                             Version.fromString(pluginManager.getPlugin(entry.getKey()).getIdentifier().getVersion())
-                    ) < 0)
+                    ) > 0)
                     .map(entry -> new ArtifactIdentifier(
                             entry.getKey().getPackageId(),
                             entry.getKey().getArtifactId(),

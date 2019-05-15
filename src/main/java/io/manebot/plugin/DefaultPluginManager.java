@@ -1,6 +1,7 @@
 package io.manebot.plugin;
 
 import io.manebot.DefaultBot;
+import io.manebot.Version;
 import io.manebot.artifact.*;
 import io.manebot.command.CommandManager;
 import io.manebot.database.DatabaseManager;
@@ -303,8 +304,51 @@ public final class DefaultPluginManager implements PluginManager {
         if (existingIdentifier != null)
             return existingIdentifier;
         else
+            // get latest supported artifact (via current API version)
             try {
-                return getRepostiory().getManifest(manifestIdentifier).getLatestVersion();
+                return getRepostiory()
+                        .getManifest(manifestIdentifier)
+                        .getVersions()
+                        .stream()
+                        .map(Version::fromString)
+                        .sorted(Comparator.comparing((Version version) -> version).reversed())
+                        .map(version -> {
+                            try {
+                                return getRepostiory().getArtifact(new ArtifactIdentifier(
+                                        manifestIdentifier.getPackageId(),
+                                        manifestIdentifier.getArtifactId(),
+                                        version.toString()
+                                ));
+                            } catch (ArtifactRepositoryException e) {
+                                throw new RuntimeException(e);
+                            }
+                        })
+                        .filter(artifact -> {
+                                    try {
+                                        return artifact.getDependencies().stream()
+                                                    .filter(dependency ->
+                                                            dependency.getType() == ArtifactDependencyLevel.PROVIDED)
+                                                    .allMatch(dependency -> {
+                                                        if (dependency.getChild().getIdentifier()
+                                                                .withoutVersion().equals(
+                                                                        bot.getApiIdentifier().withoutVersion()
+                                                                )) {
+                                                            return Version
+                                                                    .fromString(dependency.getChild().getVersion())
+                                                                    .compareTo(bot.getApiVersion())
+                                                                    <= 0;
+                                                        } else {
+                                                            return true;
+                                                        }
+                                                    });
+                                    } catch (ArtifactNotFoundException e) {
+                                        return false;
+                                    }
+                                }
+                        )
+                        .map(Artifact::getIdentifier)
+                        .findFirst()
+                        .orElse(null);
             } catch (ArtifactRepositoryException ex3) {
                 throw new IllegalArgumentException("Problem resolving identifier", ex3);
             }

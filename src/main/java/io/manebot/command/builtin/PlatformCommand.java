@@ -1,5 +1,8 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.Chat;
+import io.manebot.chat.Community;
+import io.manebot.chat.TextBuilder;
 import io.manebot.chat.TextStyle;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
@@ -16,7 +19,9 @@ import io.manebot.database.search.Search;
 import io.manebot.database.search.SearchHandler;
 import io.manebot.database.search.handler.SearchHandlerPropertyContains;
 import io.manebot.platform.Platform;
+import io.manebot.platform.PlatformConnection;
 import io.manebot.platform.PlatformManager;
+import io.manebot.platform.PlatformUser;
 import io.manebot.plugin.Plugin;
 import io.manebot.plugin.PluginException;
 import io.manebot.user.UserGroup;
@@ -206,6 +211,65 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
                                 .collect(Collectors.toList()))
                         .page(page)
                         .responder(abstractFormatter)
+        );
+    }
+
+    @Command(description = "Lists platform communities", permission = "system.platform.community.list")
+    public void listCommunities(CommandSender sender,
+                                @CommandArgumentLabel.Argument(label = "community") String community,
+                                @CommandArgumentLabel.Argument(label = "list") String list,
+                                @CommandArgumentString.Argument(label = "platform id") String platformId,
+                                @CommandArgumentPage.Argument int page)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null)
+            throw new CommandArgumentException("Platform not found.");
+
+        PlatformConnection connection = platform.getConnection();
+        if (connection == null || !connection.isConnected())
+            throw new CommandArgumentException("Platform is not connected.");
+
+        sender.sendList(
+                Community.class,
+                builder -> builder
+                        .direct(connection.getCommunities()
+                                .stream()
+                                .sorted(Comparator.comparing(Community::getId))
+                                .collect(Collectors.toList()))
+                        .page(page)
+                        .responder((textBuilder, o) -> {
+                            textBuilder.append(o.getId() + " (" + o.getName() + ")");
+                        })
+        );
+    }
+
+    @Command(description = "Gets platform community information", permission = "system.platform.community.info")
+    public void communityInfo(CommandSender sender,
+                                @CommandArgumentLabel.Argument(label = "community") String label,
+                                @CommandArgumentLabel.Argument(label = "info") String info,
+                                @CommandArgumentString.Argument(label = "platform id") String platformId,
+                                @CommandArgumentString.Argument(label = "community id") String communityId)
+            throws CommandExecutionException {
+        Platform platform = platformManager.getPlatformById(platformId);
+        if (platform == null)
+            throw new CommandArgumentException("Platform not found.");
+
+        PlatformConnection connection = platform.getConnection();
+        if (connection == null || !connection.isConnected())
+            throw new CommandArgumentException("Platform is not connected.");
+
+        Community community = connection.getCommunity(communityId);
+        if (community == null)
+            throw new CommandArgumentException("Community not found.");
+
+        sender.sendDetails(builder ->
+            builder.name("Community").key(community.getId())
+                    .item("Name", community.getName())
+                    .item("Connected", community.isConnected())
+                    .item("Users", community.getPlatformUsers().stream()
+                            .map(PlatformUser::getNickname).collect(Collectors.toList()))
+                    .item("Chats", community.getChats().stream()
+                            .map(Chat::getName).collect(Collectors.toList()))
         );
     }
 

@@ -519,6 +519,7 @@ public final class DefaultBot implements Bot, Runnable {
             bot.commandManager.registerExecutor("profile", new ProfileCommand());
             bot.commandManager.registerExecutor("whoami", new WhoAmICommand());
             bot.commandManager.registerExecutor("confirm", new ConfirmCommand());
+            bot.commandManager.registerExecutor("echo", new EchoCommand());
 
             Runtime.getRuntime().addShutdownHook(Virtual.getInstance().newThread(() -> {
                 try {

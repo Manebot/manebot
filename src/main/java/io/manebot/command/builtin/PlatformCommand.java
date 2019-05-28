@@ -28,8 +28,7 @@ import io.manebot.user.UserGroup;
 import io.manebot.user.UserManager;
 
 import java.sql.SQLException;
-import java.util.Comparator;
-import java.util.EnumSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class PlatformCommand extends AnnotatedCommandExecutor {
@@ -229,13 +228,18 @@ public class PlatformCommand extends AnnotatedCommandExecutor {
         if (connection == null || !connection.isConnected())
             throw new CommandArgumentException("Platform is not connected.");
 
+        Collection<Community> communityCollection = connection.getCommunities();
+        if (communityCollection == null) communityCollection = new ArrayList<>();
+
+        List<Community> sorted = communityCollection
+                .stream()
+                .sorted(Comparator.comparing(Community::getId))
+                .collect(Collectors.toList());
+
         sender.sendList(
                 Community.class,
                 builder -> builder
-                        .direct(connection.getCommunities()
-                                .stream()
-                                .sorted(Comparator.comparing(Community::getId))
-                                .collect(Collectors.toList()))
+                        .direct(sorted)
                         .page(page)
                         .responder((textBuilder, o) -> {
                             textBuilder.append(o.getId() + " (" + o.getName() + ")");

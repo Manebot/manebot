@@ -16,6 +16,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
     private final Class<T> entityClass;
     private final Map<String, SearchArgumentHandler> argumentHandlers;
     private final Map<String, SearchArgumentHandler> commandHandlers;
+    private final SearchArgumentHandler defaultCommandHandler;
     private final Collection<Consumer<Clause<T>>> always;
     private final Map<String, SearchOrderHandler> orderHandlers;
 
@@ -25,6 +26,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
     public DefaultSearchHandler(Database database, Class<T> entityClass,
                                 Map<String, SearchArgumentHandler> argumentHandlers,
                                 Map<String, SearchArgumentHandler> commandHandlers,
+                                SearchArgumentHandler defaultCommandHandler,
                                 SearchArgumentHandler stringHandler,
                                 Collection<Consumer<Clause<T>>> always,
                                 Map<String, SearchOrderHandler> orderHandlers,
@@ -33,6 +35,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         this.entityClass = entityClass;
         this.argumentHandlers = argumentHandlers;
         this.commandHandlers = commandHandlers;
+        this.defaultCommandHandler = defaultCommandHandler;
         this.stringHandler = stringHandler;
         this.always = always;
 
@@ -57,7 +60,9 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
 
     @Override
     public SearchArgumentHandler getCommandHandler(String s) {
-        return commandHandlers.get(s);
+        SearchArgumentHandler handler = commandHandlers.get(s);
+        if (handler == null) return defaultCommandHandler;
+        else return handler;
     }
 
     @Override
@@ -99,6 +104,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
     public SearchResult<T> search(Search search, int maxResults)
             throws SQLException, IllegalArgumentException {
         if (search.getPage() <= 0) throw new IllegalArgumentException("Invalid page: " + search.getPage());
+        else if (maxResults <= 0) throw new IllegalArgumentException("Invalid result size: " + maxResults);
 
         return database.execute(s -> {
             Metamodel metamodel = s.getMetamodel();
@@ -275,6 +281,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         private final Class<T> entityClass;
         private final Map<String, SearchArgumentHandler> argumentHandlers = new LinkedHashMap<>();
         private final Map<String, SearchArgumentHandler> commandHandlers = new LinkedHashMap<>();
+        private SearchArgumentHandler defaultCommandHandler = null;
         private final Map<String, SearchOrderHandler> orderHandlers = new LinkedHashMap<>();
         private final Collection<Consumer<Clause<T>>> always = new LinkedList<>();
 
@@ -295,6 +302,12 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         @Override
         public SearchHandler.Builder<T> command(String s, SearchArgumentHandler searchArgumentHandler) {
             this.commandHandlers.put(s, searchArgumentHandler);
+            return this;
+        }
+
+        @Override
+        public SearchHandler.Builder<T> command(SearchArgumentHandler handler) {
+            this.defaultCommandHandler = handler;
             return this;
         }
 
@@ -332,6 +345,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
                     entityClass,
                     argumentHandlers,
                     commandHandlers,
+                    defaultCommandHandler,
                     stringHandler,
                     always,
                     orderHandlers,

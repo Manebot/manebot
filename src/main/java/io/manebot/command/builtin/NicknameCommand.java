@@ -22,7 +22,7 @@ public class NicknameCommand extends AnnotatedCommandExecutor {
             throws CommandArgumentException {
         String displayName = nickname.trim();
 
-        if (!nickname.matches("^[a-zA-Z0-9]+$"))
+        if (!nickname.matches("^[a-zA-Z0-9_.]+$"))
             throw new CommandArgumentException("That nickname is not alphanumeric.");
 
         User otherUser = userManager.getUserByDisplayName(displayName);
@@ -37,6 +37,9 @@ public class NicknameCommand extends AnnotatedCommandExecutor {
 
         if (displayName.length() > 12)
             throw new CommandArgumentException("That nickname is more than 12 characters long.");
+
+        if (!Character.isLetterOrDigit(nickname.charAt(0)))
+            throw new CommandArgumentException("Nickname must start with a letter or number.");
 
         sender.getUser().setDisplayName(displayName);
         sender.sendMessage("You have set your nickname to " + displayName + ".");

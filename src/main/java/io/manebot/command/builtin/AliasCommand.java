@@ -9,7 +9,7 @@ import io.manebot.command.executor.chained.argument.CommandArgumentFollowing;
 import io.manebot.command.executor.chained.argument.CommandArgumentLabel;
 import io.manebot.command.executor.chained.argument.CommandArgumentPage;
 import io.manebot.command.executor.chained.argument.CommandArgumentString;
-import io.manebot.command.response.CommandListResponse;
+
 import io.manebot.database.model.CommandAlias;
 
 public class AliasCommand extends AnnotatedCommandExecutor {
@@ -25,8 +25,15 @@ public class AliasCommand extends AnnotatedCommandExecutor {
                     @CommandArgumentString.Argument(label = "label") String label,
                     @CommandArgumentFollowing.Argument() String alias)
             throws CommandExecutionException {
-        aliasManager.createAlias(label, alias);
-        aliasManager.reregisterAliases();
+        CommandAlias commandAlias = aliasManager.createAlias(label, alias);
+
+        try {
+            aliasManager.reregisterAliases();
+        } catch (Exception e) {
+            commandAlias.delete();
+            throw new CommandExecutionException(e);
+        }
+
         sender.sendMessage("Alias created successfully.");
     }
 

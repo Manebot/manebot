@@ -4,11 +4,13 @@ import io.manebot.database.Database;
 import io.manebot.database.search.handler.SearchArgumentHandler;
 import io.manebot.database.search.handler.SearchOrderHandler;
 
+import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.*;
 import javax.persistence.metamodel.Metamodel;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
 public class DefaultSearchHandler<T> implements SearchHandler<T> {
@@ -99,18 +101,54 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
         return predicates;
     }
 
-    @SuppressWarnings("unchecked") // criteriaQuery.select(from) will not fail
+    private List<T> searchIntl(EntityManager session,
+                            CriteriaBuilder criteriaBuilder,
+                            CriteriaQuery<T> selectQuery,
+                            Root<T> root,
+                            Predicate[] predicates,
+                            Collection<Search.Order> orders,
+                            int offset, int maxResults) {
+        // SELECT clause
+        selectQuery.select(root);
+
+        // WHERE clause
+        selectQuery.where(predicates);
+
+        // ORDER BY clause
+        List<Search.Order> searchOrders = new ArrayList<>(orders);
+        if (searchOrders.size() <= 0 && defaultOrder != null) // default to the default order if none are given
+            searchOrders.add(defaultOrder);
+
+        List<Order> compiledOrders = new ArrayList<>();
+        if (orders.size() > 0) {
+            for (Search.Order order : searchOrders) {
+                SearchOrderHandler handler = this.orderHandlers.get(order.getKey().toLowerCase());
+                if (handler == null)
+                    throw new IllegalArgumentException("Unknown sort order: " + order.getKey());
+
+                compiledOrders.add(handler.handle(root, criteriaBuilder, order.getOrder()));
+            }
+        }
+
+        if (compiledOrders.size() > 0) selectQuery.orderBy(compiledOrders);
+
+        TypedQuery<T> typedQuery = session.createQuery(selectQuery);
+        typedQuery.setFirstResult(offset); // page enumeration
+        typedQuery.setMaxResults(maxResults); // LIMIT clause
+
+        return typedQuery.getResultList();
+    }
+
     @Override
-    public SearchResult<T> search(Search search, int maxResults)
-            throws SQLException, IllegalArgumentException {
+    public SearchResult<T> search(Search search, int maxResults) throws IllegalArgumentException {
         if (search.getPage() <= 0) throw new IllegalArgumentException("Invalid page: " + search.getPage());
         else if (maxResults <= 0) throw new IllegalArgumentException("Invalid result size: " + maxResults);
 
         return database.execute(s -> {
             Metamodel metamodel = s.getMetamodel();
             CriteriaBuilder criteriaBuilder = s.getCriteriaBuilder();
-            CriteriaQuery selectQuery = criteriaBuilder.createQuery(getEntityClass());
-            Root root = selectQuery.from(metamodel.entity(getEntityClass()));
+            CriteriaQuery<T> selectQuery = criteriaBuilder.createQuery(getEntityClass());
+            Root<T> root = selectQuery.from(metamodel.entity(getEntityClass()));
             Predicate[] predicates = buildPredicates(root, criteriaBuilder, search);
 
             CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
@@ -129,42 +167,86 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
                         Collections.emptyList()
                 );
             } else {
-                // SELECT clause
-                selectQuery.select(root);
+                List<T> list = searchIntl(
+                        s, criteriaBuilder,
+                        selectQuery, root, predicates, search.getOrders(),
+                        maxResults * (search.getPage()-1), maxResults
+                );
 
-                // WHERE clause
-                selectQuery.where(predicates);
+                return new DefaultSearchResult<>(
+                        search,
+                        this,
+                        count,
+                        maxResults,
+                        search.getPage(),
+                        list
+                );
+            }
+        });
+    }
 
-                // ORDER BY clause
-                List<Search.Order> searchOrders = new ArrayList<>(search.getOrders());
-                if (searchOrders.size() <= 0 && defaultOrder != null) // default to the default order if none are given
-                    searchOrders.add(defaultOrder);
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Override
+    public SearchResult<T> random(Search search, int maxResults) throws SQLException, IllegalArgumentException {
+        if (search.getPage() != 1) throw new IllegalArgumentException("Invalid page: " + search.getPage());
+        else if (maxResults <= 0) throw new IllegalArgumentException("Invalid result size: " + maxResults);
 
-                List<Order> compiledOrders = new ArrayList<>();
-                if (search.getOrders().size() > 0) {
-                    for (Search.Order order : searchOrders) {
-                        SearchOrderHandler handler = this.orderHandlers.get(order.getKey().toLowerCase());
-                        if (handler == null)
-                            throw new IllegalArgumentException("Unknown sort order: " + order.getKey());
+        return database.execute(s -> {
+            Metamodel metamodel = s.getMetamodel();
+            CriteriaBuilder criteriaBuilder = s.getCriteriaBuilder();
+            CriteriaQuery<T> selectQuery = criteriaBuilder.createQuery(getEntityClass());
+            Root<T> root = selectQuery.from(metamodel.entity(getEntityClass()));
+            Predicate[] predicates = buildPredicates(root, criteriaBuilder, search);
 
-                        compiledOrders.add(handler.handle(root, criteriaBuilder, order.getOrder()));
+            CriteriaQuery<Long> countQuery = criteriaBuilder.createQuery(Long.class);
+            countQuery.select(criteriaBuilder.count(countQuery.from(metamodel.entity(getEntityClass()))));
+            s.createQuery(countQuery);
+            countQuery.where(predicates);
+            Long count = s.createQuery(countQuery).getSingleResult();
+
+            if (count <= 0L) {
+                return new DefaultSearchResult<>(
+                        search,
+                        this,
+                        0,
+                        maxResults,
+                        1,
+                        Collections.emptyList()
+                );
+            } else {
+                // plan query
+                //TODO: find a better performing version of random distribution generation
+                List<Long> offsets = new ArrayList<>();
+                if (maxResults < count) { // asking for less results than are in the total result set size
+                    for (long i = 0; i < maxResults; i++) {
+                        long n;
+                        while (offsets.contains(n = ThreadLocalRandom.current().nextLong(count))) ;
+                        offsets.add(n);
                     }
+                } else { // asking for more or equal results than are in the result set size
+                    for (long n = 0; n < count; n ++)
+                        offsets.add(n);
+                    Collections.shuffle(offsets);
                 }
 
-                if (compiledOrders.size() > 0) selectQuery.orderBy(compiledOrders);
+                List<T> result = new ArrayList<>(maxResults);
 
-                TypedQuery typedQuery = s.createQuery(selectQuery);
-                typedQuery.setFirstResult(maxResults * (search.getPage()-1)); // page enumeration
-                typedQuery.setMaxResults(maxResults); // LIMIT clause
-                List resultList = typedQuery.getResultList();
+                for (Long offset : offsets) {
+                    result.addAll(searchIntl(
+                            s, criteriaBuilder,
+                            selectQuery, root,
+                            predicates, search.getOrders(),
+                            (int)(long)offset, 1
+                    ));
+                }
 
                 return new DefaultSearchResult<T>(
                         search,
                         this,
                         count,
                         maxResults,
-                        search.getPage(),
-                        resultList
+                        1,
+                        result
                 );
             }
         });

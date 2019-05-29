@@ -25,7 +25,10 @@ public class AliasCommand extends AnnotatedCommandExecutor {
                     @CommandArgumentString.Argument(label = "label") String label,
                     @CommandArgumentFollowing.Argument() String alias)
             throws CommandExecutionException {
-        CommandAlias commandAlias = aliasManager.createAlias(label, alias);
+        CommandAlias commandAlias = aliasManager.getAlias(label);
+        if (commandAlias == null) throw new CommandExecutionException("Alias already exists.");
+
+        commandAlias = aliasManager.createAlias(label, alias);
 
         try {
             aliasManager.reregisterAliases();

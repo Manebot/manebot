@@ -9,6 +9,7 @@ import io.manebot.artifact.Repositories;
 import io.manebot.artifact.aether.AetherArtifactRepository;
 import io.manebot.chat.*;
 import io.manebot.command.*;
+import io.manebot.command.alias.AliasManager;
 import io.manebot.command.builtin.*;
 import io.manebot.command.exception.CommandAccessException;
 import io.manebot.command.exception.CommandArgumentException;
@@ -72,6 +73,7 @@ public final class DefaultBot implements Bot, Runnable {
     private final CommandManager commandManager = new DefaultCommandManager();
     private final ConversationProvider conversationProvider = new DefaultConversationProvider(this);
     private final DefaultUserRegistration userRegistration = new DefaultUserRegistration(this);
+    private AliasManager aliasManager;
 
     private final List<Consumer<BotState>> stateListeners = new LinkedList<>();
 
@@ -366,6 +368,7 @@ public final class DefaultBot implements Bot, Runnable {
                         model.registerEntity(UserBan.class);
                         model.registerEntity(Property.class);
                         model.registerEntity(Repository.class);
+                        model.registerEntity(CommandAlias.class);
                     });
 
                     bot.userManager = new DefaultUserManager(bot.systemDatabase);
@@ -490,6 +493,10 @@ public final class DefaultBot implements Bot, Runnable {
             );
 
             bot.chatDispatcher = new DefaultChatDispatcher(bot);
+
+            bot.aliasManager = new AliasManager(bot.systemDatabase, bot.commandManager);
+            bot.aliasManager.registerAliases();
+            bot.commandManager.registerExecutor("alias", new AliasCommand(bot.aliasManager));
 
             // Builtin commands:
             bot.commandManager.registerExecutor("ping", new PingCommand());

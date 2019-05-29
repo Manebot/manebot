@@ -85,8 +85,23 @@ public final class JavaPluginLoader implements PluginLoader {
         for (ArtifactDependency dependency : dependencyDefinitions) {
             ArtifactIdentifier dependencyIdentifier = dependency.getChild().getIdentifier();
             ManifestIdentifier dependencyManifestIdentifier = dependencyIdentifier.withoutVersion();
-            if (coreDependency.equals(dependencyManifestIdentifier))
-                continue;
+            if (coreDependency.equals(dependencyManifestIdentifier)) {
+                DefaultArtifactVersion requiredApiVersion =
+                    new DefaultArtifactVersion(dependencyIdentifier.getVersion());
+
+                if (apiVersion != null &&
+                        !requiredApiVersion.equals(apiVersion) &&
+                        requiredApiVersion.compareTo(apiVersion) > 0)
+                    throw new IllegalArgumentException(
+                            artifact.getIdentifier() +
+                                    " requires API version " +
+                                    dependencyIdentifier.getVersion().toString()
+                                    + ", but API version is " +
+                                    apiVersion.toString() +
+                                    "."
+                    );
+                else continue; // Ignore, good version etc.
+            }
 
             pluginDependencies.add(dependency);
             break;
@@ -161,26 +176,6 @@ public final class JavaPluginLoader implements PluginLoader {
             // PROVIDED dependencies are treated as shared dependencies, run in the classpath of the dependency
             // graph, and are attached typically as plugins.  manebot-core is usually ignored, though the API
             // version the plugin references in its pom.xml is important, and will be validated.
-
-            // Check to see if it is already provided in this classpath (static assignment)
-            if (coreDependency.equals(dependencyManifestIdentifier)) {
-                DefaultArtifactVersion requiredApiVersion =
-                        new DefaultArtifactVersion(dependencyIdentifier.getVersion());
-
-                if (apiVersion != null &&
-                        !requiredApiVersion.equals(apiVersion) &&
-                        requiredApiVersion.compareTo(apiVersion) > 0)
-                    throw new PluginLoadException(
-                            artifact.getIdentifier() +
-                                    " requires API version " +
-                                    dependencyIdentifier.getVersion().toString()
-                                    + ", but API version is " +
-                                    apiVersion.toString() +
-                                    "."
-                    );
-                else continue; // Ignore, good version etc.
-            }
-
             JavaPluginInstance providedDependency;
 
             // Find if the plugin has already been loaded into the system.

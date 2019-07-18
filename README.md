@@ -40,4 +40,4 @@ plugin install discord
 |--------------	|-------------------------------------	|--------------------------	|-----------------------------------------------	|
 | Discord      	| Full text and audio support         	| `plugin install discord` 	| https://github.com/Manevolent/manebot-discord 	|
 | Teamspeak 3  	| Full text and audio support 	        | `plugin install ts3`     	| https://github.com/Manevolent/manebot-ts3     	|
-| Slack        	| Coming soon: full text support      	| `plugin install slack`   	| https://github.com/Manevolent/manebot-slack   	|
+| Slack        	| Full text support                   	| `plugin install slack`   	| https://github.com/Manevolent/manebot-slack   	|

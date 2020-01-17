@@ -74,7 +74,7 @@ public class DefaultUserRegistration implements UserRegistration {
                 if (attemptedUsername.length() <= 0)
                     throw new CommandArgumentException("Desired username is too short.");
 
-                if (attemptedUsername.chars().anyMatch(character -> !Character.isLetterOrDigit((char) character)))
+                if (attemptedUsername.chars().anyMatch(character -> !Character.isLetterOrDigit((char) character) && character != '.'))
                     throw new CommandArgumentException("Desired username is not alphanumeric.");
 
                 user = bot.getUserManager().createUser(attemptedUsername, UserType.COMMON);

@@ -495,7 +495,6 @@ public final class DefaultBot implements Bot, Runnable {
             bot.chatDispatcher = new DefaultChatDispatcher(bot);
 
             bot.aliasManager = new AliasManager(bot.systemDatabase, bot.commandManager);
-            bot.aliasManager.registerAliases();
             bot.commandManager.registerExecutor("alias", new AliasCommand(bot.aliasManager));
 
             // Builtin commands:
@@ -592,6 +591,8 @@ public final class DefaultBot implements Bot, Runnable {
                     }
                 }
             });
+    
+            bot.aliasManager.registerAliases();
 
             Logger.getGlobal().info("Manebot " + bot.getVersion().toString() + " started successfully.");
 

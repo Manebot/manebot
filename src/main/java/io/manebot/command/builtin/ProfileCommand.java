@@ -52,7 +52,7 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
         Profiler profiler = getProfilerForThreadByNameOrId(threadName);
 
         // Descend to child
-        for (String token : threadName.split("\\.")) {
+        for (String token : profilerId.split("\\.")) {
             Profiler child = profiler.getChild(token);
             if (child == null)
                 throw new CommandArgumentException(profiler.getName() + " has no such child \"" + token + "\".");

@@ -1,13 +1,15 @@
 package io.manebot.command.builtin;
 
+import io.manebot.chat.*;
 import io.manebot.command.CommandSender;
 import io.manebot.command.exception.CommandArgumentException;
 import io.manebot.command.exception.CommandExecutionException;
 import io.manebot.command.executor.chained.AnnotatedCommandExecutor;
-import io.manebot.command.executor.chained.argument.CommandArgumentString;
+import io.manebot.command.executor.chained.argument.*;
 
 import io.manebot.virtual.Profiler;
 
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class ProfileCommand extends AnnotatedCommandExecutor {
@@ -16,7 +18,24 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
     private static final String EXECUTIONS_FORMAT = "%,.0f";
     private static final String SECONDS_FORMAT = "%,.3f";
     private static final String EXECUTIONS_PER_SEC_FORMAT = "%,.3f";
-
+    
+    @Command(description = "Lists threads with profilers", permission = "system.profiler.list")
+    public void list(CommandSender sender,
+                    @CommandArgumentLabel.Argument(label = "list") String list,
+                    @CommandArgumentPage.Argument() int page)
+                    throws CommandExecutionException {
+        sender.sendList(Thread.class, (builder) -> {
+            builder.direct(Arrays.stream(listThreads())
+                            .filter(thread -> Profiler.get(thread) != null)
+                            .sorted(Comparator.comparing(Thread::getName))
+                            .collect(Collectors.toList()));
+            builder.page(page);
+            builder.responder((textBuilder, thread) ->
+                            textBuilder.append(thread.getName(), EnumSet.of(TextStyle.ITALICS)).append(" ").append("(id=" + thread.getId() + ")")
+            );
+        });
+    }
+    
     @Command(description = "Gets profiler information for a specific thread", permission = "system.profiler.view")
     public void profile(CommandSender sender,
                      @CommandArgumentString.Argument(label = "thread name") String threadName)
@@ -149,7 +168,7 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
         return "Profiles system thread performance";
     }
 
-    public static Profiler getProfilerForThreadByNameOrId(String nameOrId) throws CommandArgumentException {
+    private static Profiler getProfilerForThreadByNameOrId(String nameOrId) throws CommandArgumentException {
         Long threadId;
         try {
             threadId = Long.parseLong(nameOrId);
@@ -178,5 +197,20 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
             profiler = profiler.getParent();
 
         return profiler;
+    }
+    
+    private static Thread[] listThreads() {
+        ThreadGroup rootGroup = Thread.currentThread().getThreadGroup();
+        ThreadGroup parentGroup;
+        while ((parentGroup = rootGroup.getParent()) != null) {
+            rootGroup = parentGroup;
+        }
+        
+        Thread[] threads = new Thread[rootGroup.activeCount()];
+        while (rootGroup.enumerate(threads, true ) == threads.length) {
+            threads = new Thread[threads.length * 2];
+        }
+        
+        return threads;
     }
 }

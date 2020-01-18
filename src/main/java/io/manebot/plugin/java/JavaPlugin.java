@@ -10,6 +10,7 @@ import io.manebot.database.Database;
 import io.manebot.database.DatabaseManager;
 import io.manebot.event.EventListener;
 import io.manebot.event.EventManager;
+import io.manebot.event.plugin.*;
 import io.manebot.platform.Platform;
 import io.manebot.platform.PlatformManager;
 import io.manebot.platform.PlatformRegistration;
@@ -272,6 +273,8 @@ public final class JavaPlugin implements Plugin, EventListener {
                         throw ex;
                     }
                     Logger.getGlobal().info("Enabled " + getArtifact().getIdentifier() + ".");
+    
+                    getBot().getEventDispatcher().execute(new PluginEnabledEvent(this, this));
                 } else {
                     // Only able to disable a plugin if its required dependencies are also *all* disabled.
                     Collection<Plugin> blockingDependencies = getDependers().stream()
@@ -297,6 +300,8 @@ public final class JavaPlugin implements Plugin, EventListener {
                     this.enabled = false;
                     onDisabled(future);
                     Logger.getGlobal().info("Disabled " + getArtifact().getIdentifier() + ".");
+    
+                    getBot().getEventDispatcher().execute(new PluginDisabledEvent(this, this));
 
                     // Disable all dependencies that are not explicitly registered to another dependency.
                     // if getRegistration != null, then the system will disable them at shutdown automatically.

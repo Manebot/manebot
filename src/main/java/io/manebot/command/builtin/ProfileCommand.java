@@ -178,10 +178,7 @@ public class ProfileCommand extends AnnotatedCommandExecutor {
 
         Long finalThreadId = threadId;
 
-        Thread thread =
-                Thread.getAllStackTraces()
-                        .keySet()
-                        .stream()
+        Thread thread = Arrays.stream(listThreads())
                         .filter(x -> (finalThreadId != null && x.getId() == finalThreadId) ||
                                 x.getName().toLowerCase().startsWith(nameOrId.toLowerCase()))
                         .findFirst().orElseThrow(() -> new CommandArgumentException("Thread not found."));

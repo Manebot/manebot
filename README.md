@@ -18,9 +18,17 @@ You can avoid tracking multiple code-streams for each of your bot's platforms, a
 
 * JavaDoc: https://manevolent.github.io/manebot-core/
 
+## Getting started with Docker
+
+I recommend you run Manebot with Docker, as it is designed to do so.  If you want to get started with Manebot on Docker, see my project page for the associated Docker image:
+
+https://github.com/Manevolent/manebot-docker
+
 ## Plugins
 
 Since Manebot is open-source, anyone can make a plugin for Manebot. As part of the project, Manebot has some officially developed plugins that are also open-source.
+
+* **Music bot**: https://github.com/Manevolent/manebot-music
 
 #### Plugin dependency
 

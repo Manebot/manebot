@@ -16,19 +16,19 @@ Do you have a community, such a Discord server, Skype group, IRC, and/or Teamspe
 
 You can avoid tracking multiple code-streams for each of your bot's platforms, and centralize your codebase in one place by rebasing to Manebot. You can also bring your bots into other platforms you haven't developed for yet by building your next bot on Manebot. When you use Manebot, your features are immediately available in the entire universe of supported platforms.
 
-* JavaDoc: https://manevolent.github.io/manebot-core/
+* JavaDoc: https://manebot.github.io/core/
 
 ## Getting started with Docker
 
-I recommend you run Manebot with Docker, as it is designed to do so.  If you want to get started with Manebot on Docker, see my project page for the associated Docker image:
+I recommend you run Manebot with Docker, as it is designed to do so.  If you want to get started with Manebot on Docker, see the wiki page for the associated Docker image:
 
-https://github.com/Manevolent/manebot-docker
+https://github.com/Manebot/manebot/wiki/Docker-setup
 
 ## Plugins
 
 Since Manebot is open-source, anyone can make a plugin for Manebot. As part of the project, Manebot has some officially developed plugins that are also open-source.
 
-* **Music bot**: https://github.com/Manevolent/manebot-music
+* **Music bot**: https://github.com/manebot/music
 
 #### Plugin dependency
 
@@ -46,6 +46,7 @@ plugin install discord
 
 | **Platform** 	| **Supported Features**              	| **Installation**         	| **GitHub**                                    	|
 |--------------	|-------------------------------------	|--------------------------	|-----------------------------------------------	|
-| Discord      	| Full text and audio support         	| `plugin install discord` 	| https://github.com/Manevolent/manebot-discord 	|
-| Teamspeak 3  	| Full text and audio support 	        | `plugin install ts3`     	| https://github.com/Manevolent/manebot-ts3     	|
-| Slack        	| Full text support                   	| `plugin install slack`   	| https://github.com/Manevolent/manebot-slack   	|
+| Discord      	| Full text and audio support         	| `plugin install discord` 	| https://github.com/manebot/discord 	|
+| Teamspeak 3  	| Full text and audio support 	        | `plugin install ts3`     	| https://github.com/manebot/ts3     	|
+| Slack        	| Full text support                   	| `plugin install slack`   	| https://github.com/manebot/slack   	|
+| Matrix       	| Full text support (coming soon)      	| `plugin install matrix`  	| https://github.com/manebot/matrix  	|

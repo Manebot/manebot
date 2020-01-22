@@ -1,0 +1,53 @@
+version: '2'
+
+services:
+  db:
+    image: mariadb
+    container_name: manebot-db
+    environment:
+      MYSQL_ROOT_PASSWORD: "InternalMySqlPassword_ChangeMe"
+      MYSQL_DATABASE: "manebot"
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    networks:
+      - db_net
+
+  app:
+    depends_on:
+      - db
+    image: manevolent/manebot
+    stdin_open: true
+    tty: true
+    environment:
+      - database.hibernate.dialect=org.hibernate.dialect.MariaDB53Dialect
+      - database.hibernate.connection.url=jdbc:mysql://db/manebot?useLegacyDatetimeCode=false&serverTimezone=UTC&autoReconnect=true&autoReconnectForPools=true&is-connection-validation-required=true
+      - database.hibernate.connection.username=root
+      - database.hibernate.connection.password=InternalMySqlPassword_ChangeMe
+      - database.hibernate.connection.provider_class=org.hibernate.connection.C3P0ConnectionProvider
+      - database.hibernate.c3p0.acquire_increment=3
+      - database.hibernate.c3p0.idle_test_period=10
+      - database.hibernate.c3p0.min_size=6
+      - database.hibernate.c3p0.max_size=32
+      - database.hibernate.c3p0.max_statements=0
+      - database.hibernate.c3p0.timeout=25200
+      - database.hibernate.c3p0.preferredTestQuery=select 1
+      - database.hibernate.c3p0.testConnectionOnCheckout=true
+      - database.hibernate.c3p0.idleConnectionTestPeriod=300
+      - database.hibernate.connection.pool_size=10
+    volumes:
+      - maven_data:/app/.m2
+    container_name: manebot-app
+    restart: always
+    links:
+      - db:db
+    networks:
+      - db_net
+
+volumes:
+  db_data:
+  maven_data:
+
+networks:
+ db_net:
+    driver: bridge

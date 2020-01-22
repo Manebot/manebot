@@ -17,6 +17,7 @@ Do you have a community, such a Discord server, Skype group, IRC, and/or Teamspe
 You can avoid tracking multiple code-streams for each of your bot's platforms, and centralize your codebase in one place by rebasing to Manebot. You can also bring your bots into other platforms you haven't developed for yet by building your next bot on Manebot. When you use Manebot, your features are immediately available in the entire universe of supported platforms.
 
 * JavaDoc: https://manebot.github.io/core/
+* Writing commands: https://github.com/Manebot/manebot/wiki/Writing-commands
 
 ## Getting started with Docker
 

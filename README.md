@@ -50,4 +50,4 @@ plugin install discord
 | Discord      	| Full text and audio support         	| `plugin install discord` 	| https://github.com/manebot/discord 	|
 | Teamspeak 3  	| Full text and audio support 	        | `plugin install ts3`     	| https://github.com/manebot/ts3     	|
 | Slack        	| Full text support                   	| `plugin install slack`   	| https://github.com/manebot/slack   	|
-| Matrix       	| Full text support (coming soon)      	| `plugin install matrix`  	| https://github.com/manebot/matrix  	|
+| Matrix       	| Full text support                   	| `plugin install matrix`  	| https://github.com/manebot/matrix  	|

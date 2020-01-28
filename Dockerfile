@@ -1,6 +1,6 @@
 FROM alpine/git as clone
 WORKDIR /build
-RUN git clone https://github.com/manevolent/manebot.git
+RUN git clone https://github.com/manebot/manebot.git
 
 FROM maven:3.6-jdk-11-slim as build
 WORKDIR /build

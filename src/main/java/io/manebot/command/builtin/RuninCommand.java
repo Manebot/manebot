@@ -23,7 +23,7 @@ public class RuninCommand extends AnnotatedCommandExecutor {
         this.commandDispatcher = commandDispatcher;
     }
 
-    @Command(description = "Runs a command in another conversation", permission = "system.runas")
+    @Command(description = "Runs a command in another conversation", permission = "system.runin")
     public void ban(CommandSender sender,
                     @CommandArgumentString.Argument(label = "conversation ID") String conversationId,
                     @CommandArgumentFollowing.Argument() String command)
@@ -40,7 +40,7 @@ public class RuninCommand extends AnnotatedCommandExecutor {
 
     @Override
     public String getDescription() {
-        return "Runs a command as another user";
+        return "Runs a command in another conversation";
     }
 
     private static class PseudoCommandSender extends CommandSender {

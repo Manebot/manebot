@@ -34,8 +34,6 @@ import io.manebot.platform.Platform;
 import io.manebot.platform.PlatformRegistration;
 import io.manebot.platform.console.ConsolePlatformConnection;
 import io.manebot.plugin.DefaultPluginManager;
-import io.manebot.plugin.PluginException;
-import io.manebot.plugin.PluginLoadException;
 import io.manebot.plugin.PluginRegistration;
 import io.manebot.security.DefaultElevationDispatcher;
 import io.manebot.security.ElevationDispatcher;
@@ -501,6 +499,8 @@ public final class DefaultBot implements Bot, Runnable {
             bot.commandManager.registerExecutor("ping", new PingCommand());
             bot.commandManager.registerExecutor("runas",
                     new RunasCommand(bot.userManager, bot.commandDispatcher)).alias("as");
+            bot.commandManager.registerExecutor("runin",
+                    new RuninCommand(bot.conversationProvider, bot.commandDispatcher));
             bot.commandManager.registerExecutor("help", new HelpCommand(bot.commandManager)).alias("h");
             bot.commandManager.registerExecutor("shutdown", new ShutdownCommand(bot));
             bot.commandManager.registerExecutor("plugin", new PluginCommand(bot, bot.pluginManager, bot.systemDatabase));

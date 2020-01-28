@@ -99,6 +99,11 @@ public class DefaultConversationProvider implements ConversationProvider {
     }
 
     @Override
+    public Conversation getNullConversation() {
+        return new NullConversation();
+    }
+
+    @Override
     public Conversation getConversationById(String id) {
         String[] idParts = id.split("\\:", 2);
 

@@ -597,10 +597,10 @@ public final class DefaultBot implements Bot, Runnable {
             Logger.getGlobal().info("Manebot " + bot.getVersion().toString() + " started successfully.");
 
             bot.run();
+            System.exit(0);
         } catch (Throwable e) {
             Logger.getGlobal().log(Level.SEVERE, "Problem running application", e);
-        } finally {
-            System.exit(0);
+            System.exit(1);
         }
     }
 

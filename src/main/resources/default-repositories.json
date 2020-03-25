@@ -2,7 +2,7 @@
   {
     "id": "official",
     "type": "default",
-    "url": "http://maven.teamlixo.net/repository/public/",
+    "url": "http://repo.manebot.io/repository/public/",
     "snapshots": {
       "updatePolicy": "always"
     }

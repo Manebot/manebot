@@ -1,7 +1,7 @@
 <p align="center">
   <img height="128" src="https://github.com/manebot/manebot/raw/master/manebot.png">
   <br/>
-  <a href="https://discord.gg/qJPzQX3"><img height="28" src="https://img.shields.io/discord/563010101254815776.svg?label=Discord&logo=discord&style=for-the-badge"></a> <img height="28" src="https://img.shields.io/github/issues/manebot/manebot.svg?style=for-the-badge">
+  <img height="28" src="https://img.shields.io/github/issues/manebot/manebot.svg?style=for-the-badge">
 </p>
 
 **Manebot** is a a plugin-based chatbot framework in Java, supporting a variety of *chat platforms*. The goal of this project is to provide a multi-platform API for both developers and community leads to offer cool, automated features across all their online communities at the same time.

@@ -24,6 +24,7 @@ abstract class AbstractCommandShell implements CommandShell {
             permittedExceptionClasses = new LinkedHashMap<>();
     {
         permittedExceptionClasses.put(IllegalArgumentException.class, CommandArgumentException.class);
+        permittedExceptionClasses.put(IllegalStateException.class, CommandArgumentException.class);
         permittedExceptionClasses.put(SecurityException.class, CommandAccessException.class);
     }
 
@@ -89,8 +90,6 @@ abstract class AbstractCommandShell implements CommandShell {
                 }
             } catch (ThreadDeath threadDeath) {
                 throw new CommandAccessException("Command execution was forcefully stopped.", threadDeath);
-            } catch (SecurityException e) { // Un-wrap security exceptions.
-                throw new CommandAccessException(e);
             } catch (Throwable e) {
                 // Unpack the exception down to a CommandExecutionException
                 Throwable z = e;
@@ -119,7 +118,8 @@ abstract class AbstractCommandShell implements CommandShell {
                                 .getConstructor(String.class, Throwable.class) // message, cause (to propagate stacktrace)
                                 .newInstance(e.getMessage(), e);
                     } catch (ReflectiveOperationException ex) {
-                        throw new RuntimeException(ex); // Should not happen
+                        ex.addSuppressed(e);
+                        throw new RuntimeException("Problem constructing wrapped exception", ex);
                     }
                 }
                 if (permittedException != null) throw permittedException;

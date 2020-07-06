@@ -9,7 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class DefaultVirtual extends Virtual {
-    private final Collection<VirtualProcess> processes = new HashSet<>();
+    private final Set<VirtualProcess> processes = new HashSet<>();
     private final Map<Thread, VirtualProcess> threadMap = new LinkedHashMap<>();
     private final VirtualProcess root;
     private final Logger logger;
@@ -68,7 +68,7 @@ public final class DefaultVirtual extends Virtual {
     private DefaultVirtualProcess create(VirtualProcess parent, Runnable runnable) {
         return registerProcess(new DefaultVirtualProcess(
                 parent,
-                new Thread(runnable),
+                runnable,
                 parent == null ? null : parent.getUser()
         ));
     }

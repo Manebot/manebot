@@ -42,7 +42,8 @@ public final class JavaPlugin implements Plugin, EventListener {
 
     private final Collection<Consumer<Platform.Builder>> platformBuilders;
     private final Map<String, Function<Future, CommandExecutor>> commandExecutors;
-    private final Collection<EventListener> eventListeners;
+    private final Collection<Function<Future, EventListener>> eventListeners;
+    private final Collection<EventListener> registeredListeners = new LinkedList<>();
     private final Collection<Consumer<Plugin>> dependencyListeners;
     private final Collection<PluginFunction> enable;
     private final Collection<PluginFunction> disable;
@@ -70,7 +71,7 @@ public final class JavaPlugin implements Plugin, EventListener {
                        Callable<ElevationDispatcher> elevationDispatcher,
                        Collection<Consumer<Platform.Builder>> platformBuilders,
                        Map<String, Function<Future, CommandExecutor>> commandExecutors,
-                       Collection<EventListener> eventListeners,
+                       Collection<Function<Future, EventListener>> eventListeners,
                        Collection<Consumer<Plugin>> dependencyListeners,
                        Collection<PluginFunction> enable,
                        Collection<PluginFunction> disable,
@@ -357,8 +358,11 @@ public final class JavaPlugin implements Plugin, EventListener {
                     commandExecutors.get(command).apply(future)));
 
         // Register event listeners
-        for (EventListener listener : eventListeners)
-            eventManager.registerListener(listener);
+        for (Function<Future, EventListener> eventListenerFunction : eventListeners) {
+            EventListener eventListener = eventListenerFunction.apply(future);
+            eventManager.registerListener(eventListener);
+            registeredListeners.add(eventListener);
+        }
 
         // Call all enables
         for (PluginFunction function : enable)
@@ -381,8 +385,12 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         // Unregister event listeners
-        for (EventListener listener : eventListeners)
-            eventManager.unregisterListener(listener);
+        Iterator<EventListener> eventListenerIterator = registeredListeners.iterator();
+        while (eventListenerIterator.hasNext()) {
+            EventListener eventListener = eventListenerIterator.next();
+            eventManager.unregisterListener(eventListener);
+            eventListenerIterator.remove();
+        }
 
         // Unregister platforms
         Iterator<Map.Entry<String, PlatformRegistration>> platformIterator =
@@ -413,7 +421,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         private final Callable<ElevationDispatcher> elevationDispatcher;
 
         private final Collection<Consumer<Platform.Builder>> platformBuilders = new LinkedList<>();
-        private final Collection<EventListener> eventListeners = new LinkedList<>();
+        private final Collection<Function<Future, EventListener>> eventListeners = new LinkedList<>();
         private final Collection<Consumer<Plugin>> dependencyListeners = new LinkedList<>();
         private final Collection<PluginFunction> enable = new LinkedList<>();
         private final Collection<PluginFunction> disable = new LinkedList<>();
@@ -463,7 +471,7 @@ public final class JavaPlugin implements Plugin, EventListener {
         }
 
         @Override
-        public Plugin.Builder addListener(EventListener eventListener) {
+        public Plugin.Builder addListener(Function<Future, EventListener> eventListener) {
             eventListeners.add(eventListener);
             return this;
         }

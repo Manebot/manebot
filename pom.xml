@@ -40,7 +40,7 @@
     <properties>
         <apiVersion>0.1.7</apiVersion>
 
-        <hibernateVersion>5.4.1.Final</hibernateVersion>
+        <hibernateVersion>5.4.2</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
         <mavenVersion>3.3.9</mavenVersion>
         <jline.version>3.10.0</jline.version>

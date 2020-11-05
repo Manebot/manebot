@@ -40,7 +40,7 @@
     <properties>
         <apiVersion>0.1.7</apiVersion>
 
-        <hibernateVersion>5.4.21.Final</hibernateVersion>
+        <hibernateVersion>6.0.21.Final</hibernateVersion>
         <aetherVersion>1.1.0</aetherVersion>
         <mavenVersion>3.3.9</mavenVersion>
         <jline.version>3.10.0</jline.version>
@@ -168,13 +168,13 @@
         <dependency>
             <groupId>org.hibernate</groupId>
             <artifactId>hibernate-c3p0</artifactId>
-            <version>${hibernateVersion}</version>
+            <version>5.4.23.Final</version>
         </dependency>
 
         <dependency>
-            <groupId>org.hibernate</groupId>
+            <groupId>org.hibernate.validator</groupId>
             <artifactId>hibernate-validator</artifactId>
-            <version>${hibernateVersion}</version>
+            <version>6.1.6.Final</version>
         </dependency>
 
         <dependency>

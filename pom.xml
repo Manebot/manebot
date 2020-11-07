@@ -35,7 +35,7 @@
 
     <groupId>io.manebot</groupId>
     <artifactId>manebot</artifactId>
-    <version>0.1.4</version>
+    <version>0.1.4.1</version>
 
     <properties>
         <apiVersion>0.1.7</apiVersion>

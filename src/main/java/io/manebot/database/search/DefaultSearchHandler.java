@@ -120,7 +120,7 @@ public class DefaultSearchHandler<T> implements SearchHandler<T> {
             searchOrders.add(defaultOrder);
 
         List<Order> compiledOrders = new ArrayList<>();
-        if (orders.size() > 0) {
+        if (searchOrders.size() > 0) {
             for (Search.Order order : searchOrders) {
                 SearchOrderHandler handler = this.orderHandlers.get(order.getKey().toLowerCase());
                 if (handler == null)

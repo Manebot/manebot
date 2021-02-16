@@ -20,7 +20,7 @@ public class SearchTest {
     public void testSearch_AlwaysField() throws SQLException {
         Properties properties = new Properties();
         properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-        properties.put("hibernate.connection.url", "jdbc:h2:mem:myDb;DB_CLOSE_DELAY=-1");
+        properties.put("hibernate.connection.url", "jdbc:h2:mem:AlwaysField;DB_CLOSE_DELAY=-1");
         properties.put("hibernate.show_sql", "true");
         properties.put("hibernate.format_sql", "true");
 
@@ -61,7 +61,7 @@ public class SearchTest {
     public void testSearch_MultipleAlwaysField() throws SQLException {
         Properties properties = new Properties();
         properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-        properties.put("hibernate.connection.url", "jdbc:h2:mem:myDb;DB_CLOSE_DELAY=-1");
+        properties.put("hibernate.connection.url", "jdbc:h2:mem:MultipleAlwaysField;DB_CLOSE_DELAY=-1");
         properties.put("hibernate.show_sql", "true");
         properties.put("hibernate.format_sql", "true");
 
@@ -109,7 +109,7 @@ public class SearchTest {
     public void testSearch_DefaultSort() throws SQLException {
         Properties properties = new Properties();
         properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-        properties.put("hibernate.connection.url", "jdbc:h2:mem:myDb;DB_CLOSE_DELAY=-1");
+        properties.put("hibernate.connection.url", "jdbc:h2:mem:DefaultSort;DB_CLOSE_DELAY=-1");
         properties.put("hibernate.show_sql", "true");
         properties.put("hibernate.format_sql", "true");
 

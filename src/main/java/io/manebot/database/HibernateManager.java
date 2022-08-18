@@ -467,7 +467,7 @@ public class HibernateManager implements DatabaseManager {
                 throw new IllegalArgumentException(
                         "database",
                         new ClassCastException(
-                                databases.getClass().getName() +
+                                database.getClass().getName() +
                                         " cannot be cast to " +
                                         Database.class.getName()));
 
